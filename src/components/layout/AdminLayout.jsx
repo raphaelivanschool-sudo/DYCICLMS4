@@ -1,5 +1,7 @@
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { Outlet } from 'react-router-dom';
+import { useState } from 'react';
+import MessagingModule from '../messaging/MessagingModule';
 import {
   LayoutDashboard,
   Monitor,
@@ -12,7 +14,8 @@ import {
   Bell,
   LogOut,
   ChevronRight,
-  User
+  User,
+  MessageCircle
 } from 'lucide-react';
 
 const navigation = [
@@ -24,15 +27,21 @@ const navigation = [
   { name: 'System Logs & Reports', href: '/admin/logs', icon: FileText },
   { name: 'Tickets / Support', href: '/admin/tickets', icon: Ticket },
   { name: 'Inventory', href: '/admin/inventory', icon: Package },
+  { name: 'Chats', href: '/admin/chats', icon: MessageCircle },
 ];
 
 function AdminLayout() {
   const location = useLocation();
   const navigate = useNavigate();
+  const [showMessaging, setShowMessaging] = useState(false);
 
   const handleLogout = () => {
     localStorage.removeItem('auth');
     navigate('/');
+  };
+
+  const handleChatsClick = () => {
+    setShowMessaging(true);
   };
 
   const getBreadcrumb = () => {
@@ -62,19 +71,34 @@ function AdminLayout() {
             {navigation.map((item) => {
               const isActive = location.pathname === item.href;
               const Icon = item.icon;
+              const isChats = item.name === 'Chats';
               return (
                 <li key={item.name}>
-                  <Link
-                    to={item.href}
-                    className={`flex items-center px-3 py-2.5 rounded-md text-sm font-medium transition-colors ${
-                      isActive
-                        ? 'bg-blue-600 text-white'
-                        : 'text-slate-300 hover:bg-slate-800 hover:text-white'
-                    }`}
-                  >
-                    <Icon className={`w-4 h-4 mr-3 ${isActive ? 'text-white' : 'text-slate-400'}`} />
-                    {item.name}
-                  </Link>
+                  {isChats ? (
+                    <button
+                      onClick={handleChatsClick}
+                      className={`flex items-center w-full px-3 py-2.5 rounded-md text-sm font-medium transition-colors ${
+                        showMessaging
+                          ? 'bg-blue-600 text-white'
+                          : 'text-slate-300 hover:bg-slate-800 hover:text-white'
+                      }`}
+                    >
+                      <Icon className={`w-4 h-4 mr-3 ${showMessaging ? 'text-white' : 'text-slate-400'}`} />
+                      {item.name}
+                    </button>
+                  ) : (
+                    <Link
+                      to={item.href}
+                      className={`flex items-center px-3 py-2.5 rounded-md text-sm font-medium transition-colors ${
+                        isActive
+                          ? 'bg-blue-600 text-white'
+                          : 'text-slate-300 hover:bg-slate-800 hover:text-white'
+                      }`}
+                    >
+                      <Icon className={`w-4 h-4 mr-3 ${isActive ? 'text-white' : 'text-slate-400'}`} />
+                      {item.name}
+                    </Link>
+                  )}
                 </li>
               );
             })}
@@ -132,6 +156,14 @@ function AdminLayout() {
           <Outlet />
         </main>
       </div>
+
+      {/* Messaging Module */}
+      <MessagingModule 
+        isOpen={showMessaging} 
+        onClose={() => setShowMessaging(false)} 
+        userRole="admin"
+        currentUser={{ name: 'Administrator', initials: 'AD' }}
+      />
     </div>
   );
 }
