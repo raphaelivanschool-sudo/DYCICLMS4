@@ -1,7 +1,5 @@
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { Outlet } from 'react-router-dom';
-import { useState } from 'react';
-import MessagingModule from '../messaging/MessagingModule';
 import {
   LayoutDashboard,
   Monitor,
@@ -17,21 +15,15 @@ const navigation = [
   { name: 'Student Screen Monitoring', href: '/instructor/monitoring', icon: Monitor },
   { name: 'Control Actions', href: '/instructor/controls', icon: Sliders },
   { name: 'Messaging', href: '/instructor/messaging', icon: MessageCircle },
-  { name: 'Chats', href: '/instructor/chats', icon: MessageCircle },
 ];
 
 function InstructorLayout() {
   const location = useLocation();
   const navigate = useNavigate();
-  const [showMessaging, setShowMessaging] = useState(false);
 
   const handleLogout = () => {
     localStorage.removeItem('auth');
     navigate('/');
-  };
-
-  const handleChatsClick = () => {
-    setShowMessaging(true);
   };
 
   const getBreadcrumb = () => {
@@ -61,34 +53,19 @@ function InstructorLayout() {
             {navigation.map((item) => {
               const isActive = location.pathname === item.href;
               const Icon = item.icon;
-              const isChats = item.name === 'Chats';
               return (
                 <li key={item.name}>
-                  {isChats ? (
-                    <button
-                      onClick={handleChatsClick}
-                      className={`flex items-center w-full px-3 py-2.5 rounded-md text-sm font-medium transition-colors ${
-                        showMessaging
-                          ? 'bg-[#16a34a] text-white'
-                          : 'text-slate-300 hover:bg-slate-800 hover:text-white'
-                      }`}
-                    >
-                      <Icon className={`w-4 h-4 mr-3 ${showMessaging ? 'text-white' : 'text-slate-400'}`} />
-                      {item.name}
-                    </button>
-                  ) : (
-                    <Link
-                      to={item.href}
-                      className={`flex items-center px-3 py-2.5 rounded-md text-sm font-medium transition-colors ${
-                        isActive
-                          ? 'bg-[#16a34a] text-white'
-                          : 'text-slate-300 hover:bg-slate-800 hover:text-white'
-                      }`}
-                    >
-                      <Icon className={`w-4 h-4 mr-3 ${isActive ? 'text-white' : 'text-slate-400'}`} />
-                      {item.name}
-                    </Link>
-                  )}
+                  <Link
+                    to={item.href}
+                    className={`flex items-center px-3 py-2.5 rounded-md text-sm font-medium transition-colors ${
+                      isActive
+                        ? 'bg-[#16a34a] text-white'
+                        : 'text-slate-300 hover:bg-slate-800 hover:text-white'
+                    }`}
+                  >
+                    <Icon className={`w-4 h-4 mr-3 ${isActive ? 'text-white' : 'text-slate-400'}`} />
+                    {item.name}
+                  </Link>
                 </li>
               );
             })}
@@ -146,14 +123,6 @@ function InstructorLayout() {
           <Outlet />
         </main>
       </div>
-
-      {/* Messaging Module */}
-      <MessagingModule 
-        isOpen={showMessaging} 
-        onClose={() => setShowMessaging(false)} 
-        userRole="instructor"
-        currentUser={{ name: 'Mr. Cruz', initials: 'MC' }}
-      />
     </div>
   );
 }

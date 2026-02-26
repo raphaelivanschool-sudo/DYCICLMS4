@@ -27,7 +27,7 @@ const navigation = [
   { name: 'System Logs & Reports', href: '/admin/logs', icon: FileText },
   { name: 'Tickets / Support', href: '/admin/tickets', icon: Ticket },
   { name: 'Inventory', href: '/admin/inventory', icon: Package },
-  { name: 'Chats', href: '/admin/chats', icon: MessageCircle },
+  { name: 'Messaging', href: '/admin/chats', icon: MessageCircle },
 ];
 
 function AdminLayout() {
@@ -53,7 +53,7 @@ function AdminLayout() {
   return (
     <div className="flex h-screen bg-gray-50">
       {/* Sidebar */}
-      <div className="w-64 bg-sidebar flex flex-col flex-shrink-0">
+      <div className="w-64 bg-[#1e293b] flex flex-col flex-shrink-0">
         {/* Logo Area */}
         <div className="h-16 flex items-center px-4 border-b border-slate-700">
           <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center mr-3">
@@ -71,10 +71,10 @@ function AdminLayout() {
             {navigation.map((item) => {
               const isActive = location.pathname === item.href;
               const Icon = item.icon;
-              const isChats = item.name === 'Chats';
+              const isMessaging = item.name === 'Messaging';
               return (
                 <li key={item.name}>
-                  {isChats ? (
+                  {isMessaging ? (
                     <button
                       onClick={handleChatsClick}
                       className={`flex items-center w-full px-3 py-2.5 rounded-md text-sm font-medium transition-colors ${
