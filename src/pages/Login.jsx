@@ -1,18 +1,13 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { 
+import {
   ArrowRight,
   Monitor,
   Lock,
   User
 } from 'lucide-react';
 
-// Mock user database - in real app, this would come from API
-const USERS = [
-  { username: 'admin', password: 'admin123', role: 'ADMIN', redirect: '/admin/dashboard' },
-  { username: 'instructor', password: 'instructor123', role: 'INSTRUCTOR', redirect: '/instructor/dashboard' },
-  { username: 'student', password: 'student123', role: 'STUDENT', redirect: '/student/dashboard' },
-];
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
 
 function Login() {
   const [username, setUsername] = useState('');
@@ -21,51 +16,48 @@ function Login() {
   const [isLoading, setIsLoading] = useState(false);
   const navigate = useNavigate();
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
     setIsLoading(true);
 
-    // Simulate API call to authenticate user
-    setTimeout(() => {
-      const user = USERS.find(u => u.username === username && u.password === password);
-      
-      // Console.log the full API response for debugging
-      console.log('Login API Response:', user);
-      
-      if (user) {
-        // Store token in localStorage
-        localStorage.setItem('token', 'mock-jwt-token-' + Date.now());
-        
-        // Store full user object in localStorage
-        localStorage.setItem('user', JSON.stringify({
-          username: user.username,
-          role: user.role,
-          // Add any other user fields that might come from API
-        }));
-        
-        // Store auth data in localStorage (keeping for compatibility)
-        localStorage.setItem('auth', JSON.stringify({
-          role: user.role.toLowerCase(), // Convert to lowercase to match ProtectedRoute expectations
-          username: username,
-          timestamp: Date.now()
-        }));
-        
-        // Redirect based on role
-        if (user.role === 'ADMIN') {
-          navigate('/admin/dashboard');
-        } else if (user.role === 'INSTRUCTOR') {
-          navigate('/instructor/dashboard');
-        } else if (user.role === 'STUDENT') {
-          navigate('/student/dashboard');
-        } else {
-          setError('Unknown user role. Please contact administrator.');
-        }
-      } else {
-        setError('Invalid credentials. Please try again.');
+    try {
+      const response = await fetch(`${API_URL}/api/auth/login`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ username, password }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.message || 'Invalid credentials');
       }
+
+      // Store token in localStorage
+      localStorage.setItem('token', data.token);
+
+      // Store user object in localStorage
+      localStorage.setItem('user', JSON.stringify(data.user));
+
+      // Redirect based on role
+      const role = data.user.role;
+      if (role === 'ADMIN') {
+        navigate('/admin/dashboard');
+      } else if (role === 'INSTRUCTOR') {
+        navigate('/instructor/dashboard');
+      } else if (role === 'STUDENT') {
+        navigate('/student/dashboard');
+      } else {
+        setError('Unknown user role. Please contact administrator.');
+      }
+    } catch (err) {
+      setError(err.message || 'Invalid credentials. Please try again.');
+    } finally {
       setIsLoading(false);
-    }, 800);
+    }
   };
 
 
@@ -152,8 +144,8 @@ function Login() {
             <p className="text-xs font-medium text-amber-800 mb-2">Demo Credentials:</p>
             <div className="space-y-1 text-xs text-amber-700">
               <p><strong>Username:</strong> admin / <strong>Password:</strong> admin123</p>
-              <p><strong>Username:</strong> instructor / <strong>Password:</strong> instructor123</p>
-              <p><strong>Username:</strong> student / <strong>Password:</strong> student123</p>
+              <p><strong>Username:</strong> instructor1 / <strong>Password:</strong> instructor123</p>
+              <p><strong>Username:</strong> student1 / <strong>Password:</strong> student123</p>
             </div>
           </div>
         </div>

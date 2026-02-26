@@ -22,7 +22,8 @@ function InstructorLayout() {
   const navigate = useNavigate();
 
   const handleLogout = () => {
-    localStorage.removeItem('auth');
+    // Clear all localStorage items
+    localStorage.clear();
     navigate('/');
   };
 

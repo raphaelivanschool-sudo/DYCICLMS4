@@ -1,5 +1,6 @@
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import Login from './pages/Login';
+import ProtectedRoute from './components/ProtectedRoute';
 import AdminLayout from './components/layout/AdminLayout';
 import Dashboard from './pages/admin/Dashboard';
 import Laboratories from './pages/admin/Laboratories';
@@ -21,52 +22,6 @@ import Messaging from './pages/instructor/Messaging';
 import StudentLayout from './components/layout/StudentLayout';
 import SessionDashboard from './pages/student/SessionDashboard';
 import SupportTicket from './pages/student/SupportTicket';
-
-// Simple auth check - in real app, this would validate the token
-const isAuthenticated = () => {
-  const auth = localStorage.getItem('auth');
-  if (!auth) return false;
-  try {
-    const authData = JSON.parse(auth);
-    // Check if auth is not expired (24 hours)
-    const isExpired = Date.now() - authData.timestamp > 24 * 60 * 60 * 1000;
-    return !isExpired;
-  } catch {
-    return false;
-  }
-};
-
-const getUserRole = () => {
-  const auth = localStorage.getItem('auth');
-  if (!auth) return null;
-  try {
-    const authData = JSON.parse(auth);
-    return authData.role;
-  } catch {
-    return null;
-  }
-};
-
-// Protected Route component
-const ProtectedRoute = ({ children, allowedRoles }) => {
-  if (!isAuthenticated()) {
-    return <Navigate to="/" replace />;
-  }
-  
-  const userRole = getUserRole();
-  console.log('ProtectedRoute - User role from localStorage:', userRole);
-  console.log('ProtectedRoute - Allowed roles:', allowedRoles);
-  
-  if (allowedRoles && !allowedRoles.includes(userRole)) {
-    // Redirect to appropriate portal based on role
-    if (userRole === 'admin') return <Navigate to="/admin/dashboard" replace />;
-    if (userRole === 'instructor') return <Navigate to="/instructor/dashboard" replace />;
-    if (userRole === 'student') return <Navigate to="/student/dashboard" replace />;
-    return <Navigate to="/" replace />;
-  }
-  
-  return children;
-};
 
 function App() {
   return (

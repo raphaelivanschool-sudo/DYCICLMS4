@@ -36,7 +36,8 @@ function AdminLayout() {
   const [showMessaging, setShowMessaging] = useState(false);
 
   const handleLogout = () => {
-    localStorage.removeItem('auth');
+    // Clear all localStorage items
+    localStorage.clear();
     navigate('/');
   };
 

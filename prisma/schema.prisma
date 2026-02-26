@@ -1,0 +1,190 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id          Int      @id @default(autoincrement())
+  username    String   @unique
+  password    String
+  role        Role
+  fullName    String
+  email       String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Relations
+  sessions       Session[]
+  tickets        Ticket[]
+  systemLogs     SystemLog[]
+  messages       Message[]
+  sentMessages   Message[] @relation("SentMessages")
+}
+
+model Laboratory {
+  id          Int      @id @default(autoincrement())
+  name        String
+  roomNumber  String
+  capacity    Int
+  status      LabStatus @default(ACTIVE)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Relations
+  computers  Computer[]
+  sessions   Session[]
+}
+
+model Computer {
+  id              Int      @id @default(autoincrement())
+  name            String
+  ipAddress       String?
+  macAddress      String?
+  status          ComputerStatus @default(AVAILABLE)
+  laboratoryId    Int
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  // Relations
+  laboratory Laboratory @relation(fields: [laboratoryId], references: [id])
+  sessionStudents SessionStudent[]
+}
+
+model Session {
+  id              Int      @id @default(autoincrement())
+  name            String
+  instructorId    Int
+  laboratoryId    Int
+  startTime       DateTime
+  endTime         DateTime?
+  status          SessionStatus @default(ACTIVE)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  // Relations
+  instructor      User             @relation(fields: [instructorId], references: [id])
+  laboratory      Laboratory       @relation(fields: [laboratoryId], references: [id])
+  sessionStudents SessionStudent[]
+}
+
+model SessionStudent {
+  id          Int      @id @default(autoincrement())
+  sessionId   Int
+  studentId   Int
+  computerId  Int
+  checkInTime DateTime @default(now())
+  checkOutTime DateTime?
+  status      StudentSessionStatus @default(ACTIVE)
+
+  // Relations
+  session   Session   @relation(fields: [sessionId], references: [id])
+  computer  Computer  @relation(fields: [computerId], references: [id])
+}
+
+model Ticket {
+  id          Int      @id @default(autoincrement())
+  title       String
+  description String   @db.Text
+  status      TicketStatus @default(OPEN)
+  priority    TicketPriority @default(MEDIUM)
+  category    String
+  createdBy   Int
+  assignedTo  Int?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Relations
+  creator     User     @relation(fields: [createdBy], references: [id])
+}
+
+model SystemLog {
+  id          Int      @id @default(autoincrement())
+  action      String
+  description String?
+  userId      Int?
+  ipAddress   String?
+  createdAt   DateTime @default(now())
+
+  // Relations
+  user        User?    @relation(fields: [userId], references: [id])
+}
+
+model Message {
+  id          Int      @id @default(autoincrement())
+  content     String   @db.Text
+  senderId    Int
+  receiverId  Int?
+  isBroadcast Boolean  @default(false)
+  createdAt   DateTime @default(now())
+
+  // Relations
+  sender      User     @relation("SentMessages", fields: [senderId], references: [id])
+  receiver    User?    @relation(fields: [receiverId], references: [id])
+}
+
+model Inventory {
+  id          Int      @id @default(autoincrement())
+  name        String
+  category    String
+  quantity    Int      @default(0)
+  unit        String
+  location    String?
+  status      InventoryStatus @default(ACTIVE)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+enum Role {
+  ADMIN
+  INSTRUCTOR
+  STUDENT
+}
+
+enum LabStatus {
+  ACTIVE
+  INACTIVE
+  MAINTENANCE
+}
+
+enum ComputerStatus {
+  AVAILABLE
+  IN_USE
+  OFFLINE
+  MAINTENANCE
+}
+
+enum SessionStatus {
+  ACTIVE
+  COMPLETED
+  CANCELLED
+}
+
+enum StudentSessionStatus {
+  ACTIVE
+  COMPLETED
+  ABSENT
+}
+
+enum TicketStatus {
+  OPEN
+  IN_PROGRESS
+  RESOLVED
+  CLOSED
+}
+
+enum TicketPriority {
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
+}
+
+enum InventoryStatus {
+  ACTIVE
+  INACTIVE
+  DEPLETED
+}
