@@ -1,44 +1,20 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { 
-  Shield, 
-  GraduationCap, 
-  Users, 
   ArrowRight,
   Monitor,
   Lock,
   User
 } from 'lucide-react';
 
-const ROLES = [
-  { 
-    id: 'admin', 
-    label: 'IT Administrator', 
-    icon: Shield, 
-    color: 'blue',
-    credentials: { username: 'admin', password: 'admin123' },
-    redirect: '/admin/dashboard'
-  },
-  { 
-    id: 'instructor', 
-    label: 'Instructor', 
-    icon: GraduationCap, 
-    color: 'green',
-    credentials: { username: 'instructor', password: 'instructor123' },
-    redirect: '/instructor/dashboard'
-  },
-  { 
-    id: 'student', 
-    label: 'Student', 
-    icon: Users, 
-    color: 'orange',
-    credentials: { username: 'student', password: 'student123' },
-    redirect: '/student/dashboard'
-  },
+// Mock user database - in real app, this would come from API
+const USERS = [
+  { username: 'admin', password: 'admin123', role: 'ADMIN', redirect: '/admin/dashboard' },
+  { username: 'instructor', password: 'instructor123', role: 'INSTRUCTOR', redirect: '/instructor/dashboard' },
+  { username: 'student', password: 'student123', role: 'STUDENT', redirect: '/student/dashboard' },
 ];
 
 function Login() {
-  const [selectedRole, setSelectedRole] = useState('admin');
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
@@ -50,18 +26,41 @@ function Login() {
     setError('');
     setIsLoading(true);
 
-    const role = ROLES.find(r => r.id === selectedRole);
-    
-    // Simulate authentication delay
+    // Simulate API call to authenticate user
     setTimeout(() => {
-      if (username === role.credentials.username && password === role.credentials.password) {
-        // Store auth data in localStorage
+      const user = USERS.find(u => u.username === username && u.password === password);
+      
+      // Console.log the full API response for debugging
+      console.log('Login API Response:', user);
+      
+      if (user) {
+        // Store token in localStorage
+        localStorage.setItem('token', 'mock-jwt-token-' + Date.now());
+        
+        // Store full user object in localStorage
+        localStorage.setItem('user', JSON.stringify({
+          username: user.username,
+          role: user.role,
+          // Add any other user fields that might come from API
+        }));
+        
+        // Store auth data in localStorage (keeping for compatibility)
         localStorage.setItem('auth', JSON.stringify({
-          role: selectedRole,
+          role: user.role.toLowerCase(), // Convert to lowercase to match ProtectedRoute expectations
           username: username,
           timestamp: Date.now()
         }));
-        navigate(role.redirect);
+        
+        // Redirect based on role
+        if (user.role === 'ADMIN') {
+          navigate('/admin/dashboard');
+        } else if (user.role === 'INSTRUCTOR') {
+          navigate('/instructor/dashboard');
+        } else if (user.role === 'STUDENT') {
+          navigate('/student/dashboard');
+        } else {
+          setError('Unknown user role. Please contact administrator.');
+        }
       } else {
         setError('Invalid credentials. Please try again.');
       }
@@ -69,23 +68,6 @@ function Login() {
     }, 800);
   };
 
-  const getColorClasses = (color) => {
-    const colors = {
-      blue: 'bg-blue-50 border-blue-200 text-blue-700 hover:bg-blue-100',
-      green: 'bg-green-50 border-green-200 text-green-700 hover:bg-green-100',
-      orange: 'bg-orange-50 border-orange-200 text-orange-700 hover:bg-orange-100',
-    };
-    return colors[color] || colors.blue;
-  };
-
-  const getActiveColorClasses = (color) => {
-    const colors = {
-      blue: 'bg-blue-600 text-white border-blue-600 shadow-lg shadow-blue-200',
-      green: 'bg-green-600 text-white border-green-600 shadow-lg shadow-green-200',
-      orange: 'bg-orange-600 text-white border-orange-600 shadow-lg shadow-orange-200',
-    };
-    return colors[color] || colors.blue;
-  };
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-900 via-blue-900 to-slate-900 flex flex-col items-center justify-center p-4">
@@ -106,34 +88,6 @@ function Login() {
         </div>
         
         <div className="p-6">
-          {/* Role Selector */}
-          <div className="mb-6">
-            <label className="text-sm font-medium text-slate-700 mb-3 block">Select Role</label>
-            <div className="grid grid-cols-3 gap-2">
-              {ROLES.map((role) => {
-                const Icon = role.icon;
-                const isSelected = selectedRole === role.id;
-                return (
-                  <button
-                    key={role.id}
-                    onClick={() => {
-                      setSelectedRole(role.id);
-                      setError('');
-                    }}
-                    className={`flex flex-col items-center p-3 rounded-lg border-2 transition-all duration-200 ${
-                      isSelected 
-                        ? getActiveColorClasses(role.color)
-                        : `bg-white border-slate-200 text-slate-600 hover:border-slate-300 hover:bg-slate-50`
-                    }`}
-                  >
-                    <Icon className="w-5 h-5 mb-1" />
-                    <span className="text-xs font-medium">{role.label}</span>
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="space-y-2">
               <label className="text-sm font-medium text-slate-700">Username</label>
@@ -197,9 +151,9 @@ function Login() {
           <div className="mt-6 p-4 bg-amber-50 border border-amber-200 rounded-lg">
             <p className="text-xs font-medium text-amber-800 mb-2">Demo Credentials:</p>
             <div className="space-y-1 text-xs text-amber-700">
-              <p><strong>Admin:</strong> admin / admin123</p>
-              <p><strong>Instructor:</strong> instructor / instructor123</p>
-              <p><strong>Student:</strong> student / student123</p>
+              <p><strong>Username:</strong> admin / <strong>Password:</strong> admin123</p>
+              <p><strong>Username:</strong> instructor / <strong>Password:</strong> instructor123</p>
+              <p><strong>Username:</strong> student / <strong>Password:</strong> student123</p>
             </div>
           </div>
         </div>

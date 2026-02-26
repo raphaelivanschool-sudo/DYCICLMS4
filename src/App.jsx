@@ -54,6 +54,9 @@ const ProtectedRoute = ({ children, allowedRoles }) => {
   }
   
   const userRole = getUserRole();
+  console.log('ProtectedRoute - User role from localStorage:', userRole);
+  console.log('ProtectedRoute - Allowed roles:', allowedRoles);
+  
   if (allowedRoles && !allowedRoles.includes(userRole)) {
     // Redirect to appropriate portal based on role
     if (userRole === 'admin') return <Navigate to="/admin/dashboard" replace />;
