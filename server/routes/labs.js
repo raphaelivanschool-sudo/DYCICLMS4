@@ -8,6 +8,20 @@ const prisma = new PrismaClient();
 // All routes are protected with JWT middleware
 router.use(authenticateToken);
 
+// Helper function to generate computer name prefix from lab name
+// "Computer Lab A" → "CLA", "EdTech Laboratory" → "EL", "Sandbox" → "S"
+const generateComputerPrefix = (labName) => {
+  const words = labName.trim().split(/\s+/);
+  const prefix = words.map(word => word[0].toUpperCase()).join('');
+  return prefix;
+};
+
+// Helper function to generate computer names
+const generateComputerName = (labName, seatNumber) => {
+  const prefix = generateComputerPrefix(labName);
+  return `${prefix}-PC${seatNumber.toString().padStart(2, '0')}`;
+};
+
 // GET /api/labs - Return all laboratories
 router.get('/', async (req, res) => {
   try {
@@ -21,6 +35,11 @@ router.get('/', async (req, res) => {
             id: true,
             fullName: true,
             username: true
+          }
+        },
+        computers: {
+          orderBy: {
+            seatNumber: 'asc'
           }
         },
         _count: {
@@ -41,7 +60,8 @@ router.get('/', async (req, res) => {
       status: lab.status,
       createdAt: lab.createdAt,
       assignedInstructor: lab.assignedInstructor,
-      computerCount: lab._count.computers
+      computerCount: lab._count.computers,
+      computers: lab.computers
     }));
 
     res.json(formattedLabs);
@@ -73,7 +93,7 @@ router.get('/:id', async (req, res) => {
         },
         computers: {
           orderBy: {
-            name: 'asc'
+            seatNumber: 'asc'
           }
         }
       }
@@ -90,10 +110,10 @@ router.get('/:id', async (req, res) => {
   }
 });
 
-// POST /api/labs - Create new lab
+// POST /api/labs - Create new lab with computers
 router.post('/', async (req, res) => {
   try {
-    const { name, location, roomNumber, capacity, status, assignedInstructorId } = req.body;
+    const { name, location, roomNumber, capacity, status, assignedInstructorId, computerCount } = req.body;
 
     // Validation
     if (!name || name.trim() === '') {
@@ -102,6 +122,14 @@ router.post('/', async (req, res) => {
 
     if (!capacity || isNaN(parseInt(capacity)) || parseInt(capacity) <= 0) {
       return res.status(400).json({ message: 'Valid capacity is required' });
+    }
+
+    if (!computerCount || isNaN(parseInt(computerCount)) || parseInt(computerCount) <= 0) {
+      return res.status(400).json({ message: 'Valid computer count is required (minimum 1)' });
+    }
+
+    if (parseInt(computerCount) > 200) {
+      return res.status(400).json({ message: 'Computer count cannot exceed 200' });
     }
 
     // Check if assignedInstructorId is valid if provided
@@ -118,34 +146,64 @@ router.post('/', async (req, res) => {
       }
     }
 
-    const lab = await prisma.laboratory.create({
-      data: {
-        name: name.trim(),
-        location: location?.trim() || null,
-        roomNumber: roomNumber?.trim() || name.trim(),
-        capacity: parseInt(capacity),
-        status: status || 'ACTIVE',
-        assignedInstructorId: assignedInstructorId ? parseInt(assignedInstructorId) : null
-      },
-      include: {
-        assignedInstructor: {
-          select: {
-            id: true,
-            fullName: true,
-            username: true
+    // Create lab and computers in a transaction
+    const result = await prisma.$transaction(async (tx) => {
+      // Create the lab
+      const lab = await tx.laboratory.create({
+        data: {
+          name: name.trim(),
+          location: location?.trim() || null,
+          roomNumber: roomNumber?.trim() || name.trim(),
+          capacity: parseInt(capacity),
+          status: status || 'ACTIVE',
+          assignedInstructorId: assignedInstructorId ? parseInt(assignedInstructorId) : null
+        },
+        include: {
+          assignedInstructor: {
+            select: {
+              id: true,
+              fullName: true,
+              username: true
+            }
           }
         }
+      });
+
+      // Create computers for this lab
+      const count = parseInt(computerCount);
+      const computerData = [];
+      
+      for (let i = 1; i <= count; i++) {
+        computerData.push({
+          name: generateComputerName(lab.name, i),
+          seatNumber: i,
+          status: 'OFFLINE',
+          isLocked: false,
+          laboratoryId: lab.id
+        });
       }
+
+      await tx.computer.createMany({
+        data: computerData
+      });
+
+      // Fetch the created computers
+      const computers = await tx.computer.findMany({
+        where: { laboratoryId: lab.id },
+        orderBy: { seatNumber: 'asc' }
+      });
+
+      return { ...lab, computers };
     });
 
-    res.status(201).json(lab);
+    res.status(201).json(result);
   } catch (error) {
     console.error('Error creating lab:', error);
     res.status(500).json({ message: 'Failed to create laboratory' });
   }
 });
 
-// PUT /api/labs/:id - Update lab
+// PUT /api/labs/:id - Update lab and handle computer count changes
 router.put('/:id', async (req, res) => {
   try {
     const { id } = req.params;
@@ -155,11 +213,16 @@ router.put('/:id', async (req, res) => {
       return res.status(400).json({ message: 'Invalid lab ID' });
     }
 
-    const { name, location, roomNumber, capacity, status, assignedInstructorId } = req.body;
+    const { name, location, roomNumber, capacity, status, assignedInstructorId, computerCount } = req.body;
 
     // Check if lab exists
     const existingLab = await prisma.laboratory.findUnique({
-      where: { id: labId }
+      where: { id: labId },
+      include: {
+        computers: {
+          orderBy: { seatNumber: 'asc' }
+        }
+      }
     });
 
     if (!existingLab) {
@@ -189,6 +252,48 @@ router.put('/:id', async (req, res) => {
       }
     }
 
+    // Handle computer count changes
+    let warning = null;
+    let finalComputers = existingLab.computers;
+    const currentCount = existingLab.computers.length;
+    const newCount = computerCount !== undefined ? parseInt(computerCount) : currentCount;
+
+    if (computerCount !== undefined && !isNaN(newCount)) {
+      if (newCount > 200) {
+        return res.status(400).json({ message: 'Computer count cannot exceed 200' });
+      }
+
+      if (newCount < currentCount) {
+        // Don't delete computers, just warn
+        warning = {
+          type: 'COMPUTER_COUNT_REDUCTION',
+          message: `You are reducing the computer count from ${currentCount} to ${newCount}. Existing computers will not be automatically deleted. Please manually remove computers from the Computers Panel if needed.`,
+          currentCount,
+          newCount
+        };
+      } else if (newCount > currentCount) {
+        // Add more computers
+        const computersToAdd = [];
+        const labName = name !== undefined ? name.trim() : existingLab.name;
+        
+        for (let i = currentCount + 1; i <= newCount; i++) {
+          computersToAdd.push({
+            name: generateComputerName(labName, i),
+            seatNumber: i,
+            status: 'OFFLINE',
+            isLocked: false,
+            laboratoryId: labId
+          });
+        }
+
+        await prisma.computer.createMany({
+          data: computersToAdd
+        });
+      }
+      // If same count, do nothing
+    }
+
+    // Build update data
     const updateData = {};
     if (name !== undefined) updateData.name = name.trim();
     if (location !== undefined) updateData.location = location?.trim() || null;
@@ -199,7 +304,8 @@ router.put('/:id', async (req, res) => {
       updateData.assignedInstructorId = assignedInstructorId ? parseInt(assignedInstructorId) : null;
     }
 
-    const lab = await prisma.laboratory.update({
+    // Update the lab
+    const updatedLab = await prisma.laboratory.update({
       where: { id: labId },
       data: updateData,
       include: {
@@ -213,14 +319,30 @@ router.put('/:id', async (req, res) => {
       }
     });
 
-    res.json(lab);
+    // Fetch updated computers list
+    finalComputers = await prisma.computer.findMany({
+      where: { laboratoryId: labId },
+      orderBy: { seatNumber: 'asc' }
+    });
+
+    const response = {
+      ...updatedLab,
+      computers: finalComputers,
+      computerCount: finalComputers.length
+    };
+
+    if (warning) {
+      response.warning = warning;
+    }
+
+    res.json(response);
   } catch (error) {
     console.error('Error updating lab:', error);
     res.status(500).json({ message: 'Failed to update laboratory' });
   }
 });
 
-// DELETE /api/labs/:id - Delete lab
+// DELETE /api/labs/:id - Delete lab and all its computers
 router.delete('/:id', async (req, res) => {
   try {
     const { id } = req.params;
@@ -234,11 +356,7 @@ router.delete('/:id', async (req, res) => {
     const lab = await prisma.laboratory.findUnique({
       where: { id: labId },
       include: {
-        _count: {
-          select: {
-            computers: true
-          }
-        }
+        computers: true
       }
     });
 
@@ -246,18 +364,17 @@ router.delete('/:id', async (req, res) => {
       return res.status(404).json({ message: 'Laboratory not found' });
     }
 
-    // Check if lab has computers
-    if (lab._count.computers > 0) {
-      return res.status(400).json({ 
-        message: 'Cannot delete lab with existing computers. Please remove computers first.' 
-      });
-    }
+    const computerCount = lab.computers.length;
 
+    // Delete lab and all computers (cascade delete is set in schema)
     await prisma.laboratory.delete({
       where: { id: labId }
     });
 
-    res.json({ message: 'Laboratory deleted successfully' });
+    res.json({ 
+      message: 'Laboratory and all associated computers deleted successfully',
+      deletedComputers: computerCount
+    });
   } catch (error) {
     console.error('Error deleting lab:', error);
     res.status(500).json({ message: 'Failed to delete laboratory' });

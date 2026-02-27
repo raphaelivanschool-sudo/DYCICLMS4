@@ -101,7 +101,7 @@ async function main() {
         name: `PC-${i.toString().padStart(2, '0')}`,
         ipAddress: `192.168.1.${100 + i}`,
         macAddress: `00:1A:2B:3C:4D:${i.toString().padStart(2, '0')}`,
-        status: 'AVAILABLE',
+        status: 'ONLINE',
         laboratoryId: lab.id
       }
     });

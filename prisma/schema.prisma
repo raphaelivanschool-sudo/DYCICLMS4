@@ -46,15 +46,17 @@ model Laboratory {
 model Computer {
   id              Int      @id @default(autoincrement())
   name            String
+  seatNumber      Int?
   ipAddress       String?
   macAddress      String?
-  status          ComputerStatus @default(AVAILABLE)
+  status          ComputerStatus @default(OFFLINE)
+  isLocked        Boolean  @default(false)
   laboratoryId    Int
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
 
   // Relations
-  laboratory Laboratory @relation(fields: [laboratoryId], references: [id])
+  laboratory Laboratory @relation(fields: [laboratoryId], references: [id], onDelete: Cascade)
   sessionStudents SessionStudent[]
 }
 
@@ -155,9 +157,10 @@ enum LabStatus {
 }
 
 enum ComputerStatus {
-  AVAILABLE
-  IN_USE
+  ONLINE
   OFFLINE
+  IN_USE
+  IDLE
   MAINTENANCE
 }
 

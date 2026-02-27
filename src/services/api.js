@@ -46,4 +46,19 @@ export const usersApi = {
   }
 };
 
+// Computers API
+export const computersApi = {
+  // Get all computers with optional filters
+  getAll: (filters = {}) => api.get('/api/computers', { params: filters }),
+  
+  // Get single computer by ID
+  getById: (id) => api.get(`/api/computers/${id}`),
+  
+  // Update computer
+  update: (id, data) => api.put(`/api/computers/${id}`, data),
+  
+  // Delete computer
+  delete: (id) => api.delete(`/api/computers/${id}`)
+};
+
 export default api;

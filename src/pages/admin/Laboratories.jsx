@@ -81,6 +81,7 @@ function Laboratories() {
     location: '',
     roomNumber: '',
     capacity: '',
+    computerCount: '',
     status: 'ACTIVE',
     assignedInstructorId: ''
   });
@@ -122,6 +123,7 @@ function Laboratories() {
       location: '',
       roomNumber: '',
       capacity: '',
+      computerCount: '',
       status: 'ACTIVE',
       assignedInstructorId: ''
     });
@@ -137,6 +139,7 @@ function Laboratories() {
       location: lab.location || '',
       roomNumber: lab.roomNumber || '',
       capacity: lab.capacity || '',
+      computerCount: lab.computerCount || 0,
       status: lab.status || 'ACTIVE',
       assignedInstructorId: lab.assignedInstructor?.id?.toString() || ''
     });
@@ -171,6 +174,11 @@ function Laboratories() {
       return;
     }
 
+    if (modalMode === 'add' && (!formData.computerCount || isNaN(formData.computerCount) || parseInt(formData.computerCount) <= 0)) {
+      setModalError('Valid computer count is required (minimum 1)');
+      return;
+    }
+
     try {
       setSubmitLoading(true);
       setModalError(null);
@@ -181,15 +189,20 @@ function Laboratories() {
         roomNumber: formData.roomNumber.trim() || formData.name.trim(),
         capacity: parseInt(formData.capacity),
         status: formData.status,
-        assignedInstructorId: formData.assignedInstructorId || null
+        assignedInstructorId: formData.assignedInstructorId || null,
+        computerCount: parseInt(formData.computerCount)
       };
 
       if (modalMode === 'add') {
         await labsApi.create(payload);
         showToast('Laboratory added successfully');
       } else {
-        await labsApi.update(selectedLab.id, payload);
-        showToast('Laboratory updated successfully');
+        const response = await labsApi.update(selectedLab.id, payload);
+        if (response.data.warning) {
+          showToast(response.data.warning.message, 'error');
+        } else {
+          showToast('Laboratory updated successfully');
+        }
       }
 
       handleCloseModal();
@@ -430,7 +443,7 @@ function Laboratories() {
                   <div className="flex items-center gap-2">
                     <Monitor className="w-4 h-4 text-gray-400" />
                     <span className="text-sm text-gray-600">
-                      Computers: <span className="font-medium text-gray-900">{lab.computerCount || 0}</span>
+                      Computers: <span className="font-medium text-gray-900">{lab.computerCount || 0} / {lab.capacity}</span>
                     </span>
                   </div>
                 </div>
@@ -525,6 +538,52 @@ function Laboratories() {
                   />
                 </div>
                 <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    {modalMode === 'add' ? (
+                      <>Number of Computers <span className="text-red-500">*</span></>
+                    ) : (
+                      'Number of Computers'
+                    )}
+                  </label>
+                  <input
+                    type="number"
+                    name="computerCount"
+                    placeholder={modalMode === 'add' ? "5" : `${selectedLab?.computerCount || 0}`}
+                    value={formData.computerCount}
+                    onChange={handleInputChange}
+                    min="1"
+                    max="200"
+                    className="w-full h-10 px-3 py-2 bg-white border border-gray-300 rounded-md text-sm placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  />
+                  {modalMode === 'add' && formData.name && formData.computerCount > 0 && (
+                    <p className="mt-1 text-xs text-blue-600">
+                      This will create {formData.computerCount} computers named{' '}
+                      {formData.name.split(' ').map(w => w[0]?.toUpperCase()).join('')}-PC01 to{' '}
+                      {formData.name.split(' ').map(w => w[0]?.toUpperCase()).join('')}-PC{String(formData.computerCount).padStart(2, '0')}
+                    </p>
+                  )}
+                  {modalMode === 'edit' && selectedLab && (
+                    <div className="mt-1 text-xs">
+                      {parseInt(formData.computerCount) > (selectedLab.computerCount || 0) ? (
+                        <span className="text-blue-600">
+                          Will add {parseInt(formData.computerCount) - (selectedLab.computerCount || 0)} more computers
+                        </span>
+                      ) : parseInt(formData.computerCount) < (selectedLab.computerCount || 0) ? (
+                        <span className="text-yellow-600">
+                          Warning: Reducing count won't delete existing computers. Remove them manually in Computers Panel.
+                        </span>
+                      ) : (
+                        <span className="text-gray-500">
+                          Currently has {selectedLab.computerCount || 0} computers
+                        </span>
+                      )}
+                    </div>
+                  )}
+                </div>
+              </div>
+              
+              <div className="grid grid-cols-2 gap-4">
+                <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Status</label>
                   <select
                     name="status"
@@ -536,23 +595,22 @@ function Laboratories() {
                     <option value="INACTIVE">Inactive</option>
                   </select>
                 </div>
-              </div>
-              
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Assigned Instructor</label>
-                <select
-                  name="assignedInstructorId"
-                  value={formData.assignedInstructorId}
-                  onChange={handleInputChange}
-                  className="w-full h-10 px-3 py-2 bg-white border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                >
-                  <option value="">-- Unassigned --</option>
-                  {instructors.map(inst => (
-                    <option key={inst.id} value={inst.id}>
-                      {inst.fullName}
-                    </option>
-                  ))}
-                </select>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Assigned Instructor</label>
+                  <select
+                    name="assignedInstructorId"
+                    value={formData.assignedInstructorId}
+                    onChange={handleInputChange}
+                    className="w-full h-10 px-3 py-2 bg-white border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  >
+                    <option value="">-- Unassigned --</option>
+                    {instructors.map(inst => (
+                      <option key={inst.id} value={inst.id}>
+                        {inst.fullName}
+                      </option>
+                    ))}
+                  </select>
+                </div>
               </div>
             </div>
             
@@ -596,10 +654,17 @@ function Laboratories() {
               </div>
               <h3 className="text-lg font-semibold text-gray-900">Delete Laboratory</h3>
             </div>
-            <p className="text-gray-600 mb-6">
-              Are you sure you want to delete <strong>{deleteConfirm.name}</strong>? 
-              This action cannot be undone.
+            <p className="text-gray-600 mb-2">
+              Are you sure you want to delete <strong>{deleteConfirm.name}</strong>?
             </p>
+            {deleteConfirm.computerCount > 0 && (
+              <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3 mb-4">
+                <p className="text-sm text-yellow-800">
+                  <strong>Warning:</strong> This laboratory has {deleteConfirm.computerCount} computer{deleteConfirm.computerCount !== 1 ? 's' : ''} assigned to it. 
+                  Deleting this lab will also delete all associated computers. This action cannot be undone.
+                </p>
+              </div>
+            )}
             <div className="flex justify-end space-x-3">
               <button
                 onClick={() => setDeleteConfirm(null)}
