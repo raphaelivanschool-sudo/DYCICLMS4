@@ -61,4 +61,13 @@ export const computersApi = {
   delete: (id) => api.delete(`/api/computers/${id}`)
 };
 
+// Dashboard API
+export const dashboardApi = {
+  // Get all dashboard statistics
+  getStats: () => api.get('/api/dashboard/stats'),
+  
+  // Get recent activity logs
+  getRecentActivity: () => api.get('/api/dashboard/recent-activity')
+};
+
 export default api;

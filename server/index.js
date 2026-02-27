@@ -44,10 +44,12 @@ import authRoutes from './routes/auth.js';
 import labsRoutes from './routes/labs.js';
 import usersRoutes from './routes/users.js';
 import computersRoutes from './routes/computers.js';
+import dashboardRoutes from './routes/dashboard.js';
 app.use('/api/auth', authRoutes);
 app.use('/api/labs', labsRoutes);
 app.use('/api/users', usersRoutes);
 app.use('/api/computers', computersRoutes);
+app.use('/api/dashboard', dashboardRoutes);
 
 // Health check endpoint
 app.get('/api/health', (req, res) => {
