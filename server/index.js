@@ -41,7 +41,11 @@ app.use(express.json());
 
 // Routes
 import authRoutes from './routes/auth.js';
+import labsRoutes from './routes/labs.js';
+import usersRoutes from './routes/users.js';
 app.use('/api/auth', authRoutes);
+app.use('/api/labs', labsRoutes);
+app.use('/api/users', usersRoutes);
 
 // Health check endpoint
 app.get('/api/health', (req, res) => {
