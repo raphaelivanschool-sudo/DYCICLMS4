@@ -55,6 +55,13 @@ router.get('/', async (req, res) => {
       labLocation: comp.laboratory.location,
       createdAt: comp.createdAt,
       updatedAt: comp.updatedAt,
+      // Hardware specifications
+      processor: comp.processor,
+      ram: comp.ram,
+      storageType: comp.storageType,
+      storageSize: comp.storageSize,
+      gpu: comp.gpu,
+      osVersion: comp.osVersion,
       // Add placeholder fields for monitoring data (will be populated by agent service later)
       user: null, // Will be populated when agent reports active user
       cpu: 0,     // Will be populated by agent
@@ -113,7 +120,8 @@ router.put('/:id', async (req, res) => {
       return res.status(400).json({ message: 'Invalid computer ID' });
     }
 
-    const { name, status, isLocked, ipAddress, macAddress, seatNumber } = req.body;
+    const { name, status, isLocked, ipAddress, macAddress, seatNumber, 
+      processor, ram, storageType, storageSize, gpu, osVersion } = req.body;
 
     // Check if computer exists
     const existingComputer = await prisma.computer.findUnique({
@@ -139,6 +147,14 @@ router.put('/:id', async (req, res) => {
     if (ipAddress !== undefined) updateData.ipAddress = ipAddress || null;
     if (macAddress !== undefined) updateData.macAddress = macAddress || null;
     if (seatNumber !== undefined) updateData.seatNumber = parseInt(seatNumber);
+    
+    // Hardware specifications
+    if (processor !== undefined) updateData.processor = processor || null;
+    if (ram !== undefined) updateData.ram = ram || null;
+    if (storageType !== undefined) updateData.storageType = storageType || null;
+    if (storageSize !== undefined) updateData.storageSize = storageSize || null;
+    if (gpu !== undefined) updateData.gpu = gpu || null;
+    if (osVersion !== undefined) updateData.osVersion = osVersion || null;
 
     const computer = await prisma.computer.update({
       where: { id: computerId },
@@ -195,6 +211,141 @@ router.delete('/:id', async (req, res) => {
   } catch (error) {
     console.error('Error deleting computer:', error);
     res.status(500).json({ message: 'Failed to delete computer' });
+  }
+});
+
+// GET /api/computers/:id/software - Get software installed on a computer
+router.get('/:id/software', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const computerId = parseInt(id);
+
+    if (isNaN(computerId)) {
+      return res.status(400).json({ message: 'Invalid computer ID' });
+    }
+
+    // Check if computer exists
+    const computer = await prisma.computer.findUnique({
+      where: { id: computerId }
+    });
+
+    if (!computer) {
+      return res.status(404).json({ message: 'Computer not found' });
+    }
+
+    const software = await prisma.computerSoftware.findMany({
+      where: { computerId },
+      orderBy: { installedAt: 'desc' }
+    });
+
+    res.json(software);
+  } catch (error) {
+    console.error('Error fetching computer software:', error);
+    res.status(500).json({ message: 'Failed to fetch software list' });
+  }
+});
+
+// POST /api/computers/:id/software - Add software to a computer
+router.post('/:id/software', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const computerId = parseInt(id);
+    const { softwareName, version } = req.body;
+
+    if (isNaN(computerId)) {
+      return res.status(400).json({ message: 'Invalid computer ID' });
+    }
+
+    if (!softwareName || softwareName.trim() === '') {
+      return res.status(400).json({ message: 'Software name is required' });
+    }
+
+    // Check if computer exists
+    const computer = await prisma.computer.findUnique({
+      where: { id: computerId }
+    });
+
+    if (!computer) {
+      return res.status(404).json({ message: 'Computer not found' });
+    }
+
+    const software = await prisma.computerSoftware.create({
+      data: {
+        computerId,
+        softwareName: softwareName.trim(),
+        version: version?.trim() || null
+      }
+    });
+
+    res.status(201).json(software);
+  } catch (error) {
+    console.error('Error adding software:', error);
+    if (error.code === 'P2002') {
+      return res.status(400).json({ message: 'Software already exists on this computer' });
+    }
+    res.status(500).json({ message: 'Failed to add software' });
+  }
+});
+
+// DELETE /api/computers/:id/software/:softwareId - Remove software from a computer
+router.delete('/:id/software/:softwareId', async (req, res) => {
+  try {
+    const { id, softwareId } = req.params;
+    const computerId = parseInt(id);
+    const sId = parseInt(softwareId);
+
+    if (isNaN(computerId) || isNaN(sId)) {
+      return res.status(400).json({ message: 'Invalid ID' });
+    }
+
+    await prisma.computerSoftware.delete({
+      where: { id: sId }
+    });
+
+    res.json({ message: 'Software removed successfully' });
+  } catch (error) {
+    console.error('Error removing software:', error);
+    res.status(500).json({ message: 'Failed to remove software' });
+  }
+});
+
+// POST /api/computers/bulk-update - Bulk update computers
+router.post('/bulk-update', async (req, res) => {
+  try {
+    const { computerIds, specs } = req.body;
+
+    if (!Array.isArray(computerIds) || computerIds.length === 0) {
+      return res.status(400).json({ message: 'Computer IDs array is required' });
+    }
+
+    const validIds = computerIds.map(id => parseInt(id)).filter(id => !isNaN(id));
+
+    if (validIds.length === 0) {
+      return res.status(400).json({ message: 'No valid computer IDs provided' });
+    }
+
+    // Build update data from specs
+    const updateData = {};
+    if (specs.processor !== undefined) updateData.processor = specs.processor || null;
+    if (specs.ram !== undefined) updateData.ram = specs.ram || null;
+    if (specs.storageType !== undefined) updateData.storageType = specs.storageType || null;
+    if (specs.storageSize !== undefined) updateData.storageSize = specs.storageSize || null;
+    if (specs.gpu !== undefined) updateData.gpu = specs.gpu || null;
+    if (specs.osVersion !== undefined) updateData.osVersion = specs.osVersion || null;
+
+    // Update all specified computers
+    const result = await prisma.computer.updateMany({
+      where: { id: { in: validIds } },
+      data: updateData
+    });
+
+    res.json({ 
+      message: `Updated ${result.count} computers successfully`,
+      updatedCount: result.count
+    });
+  } catch (error) {
+    console.error('Error bulk updating computers:', error);
+    res.status(500).json({ message: 'Failed to update computers' });
   }
 });
 

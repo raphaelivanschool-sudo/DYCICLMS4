@@ -14,7 +14,19 @@ import {
   Trash2,
   Edit2,
   X,
-  CheckCircle
+  CheckCircle,
+  Cpu,
+  HardDrive,
+  MemoryStick,
+  MonitorPlay,
+  Settings,
+  Copy,
+  CheckSquare,
+  Square,
+  FileSpreadsheet,
+  Wrench,
+  Package,
+  Plus
 } from 'lucide-react';
 
 // Inline Badge component
@@ -63,6 +75,34 @@ function Computers() {
   
   // Toast notification
   const [toast, setToast] = useState(null);
+
+  // Edit Specs Modal
+  const [editSpecsModal, setEditSpecsModal] = useState(null);
+  const [specsForm, setSpecsForm] = useState({
+    processor: '',
+    ram: '',
+    storageType: 'SSD',
+    storageSize: '',
+    gpu: '',
+    osVersion: '',
+    ipAddress: '',
+    macAddress: ''
+  });
+
+  // Software Modal
+  const [softwareModal, setSoftwareModal] = useState(null);
+  const [softwareList, setSoftwareList] = useState([]);
+  const [newSoftware, setNewSoftware] = useState({ name: '', version: '' });
+
+  // Bulk Selection
+  const [selectedComputers, setSelectedComputers] = useState([]);
+  const [bulkMode, setBulkMode] = useState(false);
+
+  // Bulk Edit Modal
+  const [bulkEditModal, setBulkEditModal] = useState(false);
+
+  // Clone Specs Modal
+  const [cloneModal, setCloneModal] = useState(null);
 
   // Fetch computers and labs on mount
   useEffect(() => {
@@ -122,6 +162,136 @@ function Computers() {
     }
   };
 
+  // Edit Specs Handlers
+  const handleOpenEditSpecs = (computer) => {
+    setSpecsForm({
+      processor: computer.processor || '',
+      ram: computer.ram || '',
+      storageType: computer.storageType || 'SSD',
+      storageSize: computer.storageSize || '',
+      gpu: computer.gpu || '',
+      osVersion: computer.osVersion || '',
+      ipAddress: computer.ipAddress || '',
+      macAddress: computer.macAddress || ''
+    });
+    setEditSpecsModal(computer);
+  };
+
+  const handleSaveSpecs = async () => {
+    try {
+      await computersApi.update(editSpecsModal.id, specsForm);
+      showToast('Computer specifications updated');
+      setEditSpecsModal(null);
+      await fetchData();
+    } catch (err) {
+      console.error('Error updating specs:', err);
+      showToast('Failed to update specifications', 'error');
+    }
+  };
+
+  // Software Handlers
+  const handleOpenSoftware = async (computer) => {
+    setSoftwareModal(computer);
+    try {
+      const res = await computersApi.getSoftware(computer.id);
+      setSoftwareList(res.data);
+    } catch (err) {
+      console.error('Error fetching software:', err);
+      setSoftwareList([]);
+    }
+  };
+
+  const handleAddSoftware = async () => {
+    if (!newSoftware.name.trim()) return;
+    
+    try {
+      await computersApi.addSoftware(softwareModal.id, {
+        softwareName: newSoftware.name,
+        version: newSoftware.version
+      });
+      showToast('Software added successfully');
+      setNewSoftware({ name: '', version: '' });
+      
+      // Refresh software list
+      const res = await computersApi.getSoftware(softwareModal.id);
+      setSoftwareList(res.data);
+    } catch (err) {
+      console.error('Error adding software:', err);
+      showToast(err.response?.data?.message || 'Failed to add software', 'error');
+    }
+  };
+
+  const handleRemoveSoftware = async (softwareId) => {
+    try {
+      await computersApi.removeSoftware(softwareModal.id, softwareId);
+      showToast('Software removed');
+      
+      // Refresh software list
+      const res = await computersApi.getSoftware(softwareModal.id);
+      setSoftwareList(res.data);
+    } catch (err) {
+      console.error('Error removing software:', err);
+      showToast('Failed to remove software', 'error');
+    }
+  };
+
+  // Bulk Selection Handlers
+  const handleToggleSelect = (computerId) => {
+    setSelectedComputers(prev => 
+      prev.includes(computerId) 
+        ? prev.filter(id => id !== computerId)
+        : [...prev, computerId]
+    );
+  };
+
+  const handleSelectAll = () => {
+    if (selectedComputers.length === filteredComputers.length) {
+      setSelectedComputers([]);
+    } else {
+      setSelectedComputers(filteredComputers.map(c => c.id));
+    }
+  };
+
+  const handleBulkUpdate = async () => {
+    try {
+      await computersApi.bulkUpdate(selectedComputers, specsForm);
+      showToast(`Updated ${selectedComputers.length} computers`);
+      setBulkEditModal(false);
+      setSelectedComputers([]);
+      setBulkMode(false);
+      await fetchData();
+    } catch (err) {
+      console.error('Error bulk updating:', err);
+      showToast('Failed to update computers', 'error');
+    }
+  };
+
+  // Clone Specs Handler
+  const handleOpenClone = (sourceComputer) => {
+    setCloneModal({ source: sourceComputer, targets: [] });
+  };
+
+  const handleCloneSpecs = async () => {
+    try {
+      const sourceSpecs = {
+        processor: cloneModal.source.processor,
+        ram: cloneModal.source.ram,
+        storageType: cloneModal.source.storageType,
+        storageSize: cloneModal.source.storageSize,
+        gpu: cloneModal.source.gpu,
+        osVersion: cloneModal.source.osVersion
+      };
+      
+      await computersApi.bulkUpdate(cloneModal.targets, sourceSpecs);
+      showToast(`Cloned specs to ${cloneModal.targets.length} computers`);
+      setCloneModal(null);
+      await fetchData();
+    } catch (err) {
+      console.error('Error cloning specs:', err);
+      showToast('Failed to clone specifications', 'error');
+    }
+  };
+
   // Filter computers based on search, lab, and status
   const filteredComputers = computers.filter(comp => {
     const matchesSearch = 
@@ -164,6 +334,10 @@ function Computers() {
     return <div className={`w-2 h-2 rounded-full ${colors[status] || 'bg-gray-500'}`}></div>;
   };
 
+  const hasSpecs = (computer) => {
+    return computer.processor || computer.ram || computer.storageSize || computer.osVersion;
+  };
+
   if (loading) {
     return (
       <div className="space-y-6">
@@ -200,13 +374,35 @@ function Computers() {
           <h1 className="text-2xl font-bold text-gray-900">Computers Panel</h1>
           <p className="text-gray-500">Monitor and manage all computers across laboratories</p>
         </div>
-        <button 
-          onClick={handleRefresh}
-          className="flex items-center px-4 py-2 bg-white border border-gray-300 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors"
-        >
-          <Power className="w-4 h-4 mr-2" />
-          Refresh Status
-        </button>
+        <div className="flex items-center gap-2">
+          <button 
+            onClick={() => setBulkMode(!bulkMode)}
+            className={`flex items-center px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+              bulkMode 
+                ? 'bg-blue-600 text-white' 
+                : 'bg-white border border-gray-300 text-gray-700 hover:bg-gray-50'
+            }`}
+          >
+            <CheckSquare className="w-4 h-4 mr-2" />
+            {bulkMode ? 'Exit Bulk Mode' : 'Bulk Select'}
+          </button>
+          {bulkMode && selectedComputers.length > 0 && (
+            <button 
+              onClick={() => setBulkEditModal(true)}
+              className="flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700"
+            >
+              <Settings className="w-4 h-4 mr-2" />
+              Edit Selected ({selectedComputers.length})
+            </button>
+          )}
+          <button 
+            onClick={handleRefresh}
+            className="flex items-center px-4 py-2 bg-white border border-gray-300 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors"
+          >
+            <Power className="w-4 h-4 mr-2" />
+            Refresh Status
+          </button>
+        </div>
       </div>
 
       {/* Error Alert */}
@@ -264,6 +460,27 @@ function Computers() {
               </select>
             </div>
           </div>
+          
+          {/* Bulk Selection Bar */}
+          {bulkMode && (
+            <div className="mt-4 pt-4 border-t border-gray-200 flex items-center justify-between">
+              <div className="flex items-center gap-4">
+                <button
+                  onClick={handleSelectAll}
+                  className="flex items-center gap-2 text-sm text-gray-600 hover:text-gray-900"
+                >
+                  {selectedComputers.length === filteredComputers.length ? (
+                    <><CheckSquare className="w-4 h-4" /> Deselect All</>
+                  ) : (
+                    <><Square className="w-4 h-4" /> Select All ({filteredComputers.length})</>
+                  )}
+                </button>
+                <span className="text-sm text-gray-500">
+                  {selectedComputers.length} selected
+                </span>
+              </div>
+            </div>
+          )}
         </div>
       </div>
 
@@ -286,10 +503,24 @@ function Computers() {
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
           {filteredComputers.map((computer) => (
-            <div key={computer.id} className="bg-white rounded-lg border border-gray-200 shadow-sm hover:shadow-md transition-shadow">
+            <div key={computer.id} className={`bg-white rounded-lg border shadow-sm hover:shadow-md transition-shadow ${
+              selectedComputers.includes(computer.id) ? 'border-blue-500 ring-2 ring-blue-200' : 'border-gray-200'
+            }`}>
               <div className="p-4">
                 <div className="flex items-start justify-between mb-3">
                   <div className="flex items-center">
+                    {bulkMode && (
+                      <button
+                        onClick={() => handleToggleSelect(computer.id)}
+                        className="mr-2 text-gray-400 hover:text-blue-600"
+                      >
+                        {selectedComputers.includes(computer.id) ? (
+                          <CheckSquare className="w-5 h-5 text-blue-600" />
+                        ) : (
+                          <Square className="w-5 h-5" />
+                        )}
+                      </button>
+                    )}
                     <Monitor className="w-5 h-5 text-gray-600 mr-2" />
                     <div>
                       <p className="font-semibold text-gray-900">{computer.name}</p>
@@ -324,6 +555,23 @@ function Computers() {
                     <div className="flex items-center justify-between">
                       <span className="text-gray-500">Lock Status:</span>
                       <Badge variant="warning">Locked</Badge>
+                    </div>
+                  )}
+                  
+                  {/* Specs Summary */}
+                  {hasSpecs(computer) && (
+                    <div className="mt-2 pt-2 border-t border-gray-100">
+                      <div className="flex items-center gap-1 text-xs text-gray-500">
+                        <Cpu className="w-3 h-3" />
+                        <span className="truncate">{computer.processor || 'No CPU info'}</span>
+                      </div>
+                      <div className="flex items-center gap-1 text-xs text-gray-500 mt-1">
+                        <MemoryStick className="w-3 h-3" />
+                        <span>{computer.ram || '-'} RAM</span>
+                        <span className="mx-1">•</span>
+                        <HardDrive className="w-3 h-3" />
+                        <span>{computer.storageSize || '-'}</span>
+                      </div>
                     </div>
                   )}
                 </div>
@@ -369,11 +617,26 @@ function Computers() {
                       <Lock className="w-4 h-4 text-gray-600" />
                     )}
                   </button>
-                  <button className="p-2 hover:bg-gray-100 rounded-lg transition-colors" title="Send Message">
-                    <MessageSquare className="w-4 h-4 text-gray-600" />
+                  <button 
+                    className="p-2 hover:bg-gray-100 rounded-lg transition-colors" 
+                    title="View Software"
+                    onClick={() => handleOpenSoftware(computer)}
+                  >
+                    <Package className="w-4 h-4 text-purple-600" />
                   </button>
-                  <button className="p-2 hover:bg-gray-100 rounded-lg transition-colors" title="Edit Computer">
-                    <Edit2 className="w-4 h-4 text-blue-600" />
+                  <button 
+                    className="p-2 hover:bg-gray-100 rounded-lg transition-colors" 
+                    title="Edit Specs"
+                    onClick={() => handleOpenEditSpecs(computer)}
+                  >
+                    <Wrench className="w-4 h-4 text-blue-600" />
+                  </button>
+                  <button 
+                    className="p-2 hover:bg-gray-100 rounded-lg transition-colors" 
+                    title="Clone Specs"
+                    onClick={() => handleOpenClone(computer)}
+                  >
+                    <Copy className="w-4 h-4 text-green-600" />
                   </button>
                   <button 
                     className="p-2 hover:bg-gray-100 rounded-lg transition-colors" 
@@ -386,6 +649,450 @@ function Computers() {
               </div>
             </div>
           ))}
+        </div>
+      )}
+
+      {/* Edit Specs Modal */}
+      {editSpecsModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg shadow-xl w-full max-w-lg mx-4">
+            <div className="p-6 border-b border-gray-200">
+              <div className="flex items-center justify-between">
+                <h2 className="text-xl font-bold text-gray-900 flex items-center gap-2">
+                  <Wrench className="w-5 h-5" />
+                  Edit PC Specifications
+                </h2>
+                <button 
+                  onClick={() => setEditSpecsModal(null)}
+                  className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+                >
+                  <X className="w-5 h-5 text-gray-500" />
+                </button>
+              </div>
+              <p className="text-sm text-gray-500 mt-1">{editSpecsModal.name} - {editSpecsModal.lab}</p>
+            </div>
+            
+            <div className="p-6 space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Processor (CPU)</label>
+                  <input
+                    type="text"
+                    placeholder="e.g., Intel Core i7-10700"
+                    value={specsForm.processor}
+                    onChange={(e) => setSpecsForm({...specsForm, processor: e.target.value})}
+                    className="w-full h-10 px-3 py-2 bg-white border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">RAM</label>
+                  <input
+                    type="text"
+                    placeholder="e.g., 16GB DDR4"
+                    value={specsForm.ram}
+                    onChange={(e) => setSpecsForm({...specsForm, ram: e.target.value})}
+                    className="w-full h-10 px-3 py-2 bg-white border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
+              </div>
+              
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Storage Type</label>
+                  <select
+                    value={specsForm.storageType}
+                    onChange={(e) => setSpecsForm({...specsForm, storageType: e.target.value})}
+                    className="w-full h-10 px-3 py-2 bg-white border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  >
+                    <option value="SSD">SSD</option>
+                    <option value="HDD">HDD</option>
+                    <option value="NVMe">NVMe SSD</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Storage Size</label>
+                  <input
+                    type="text"
+                    placeholder="e.g., 512GB"
+                    value={specsForm.storageSize}
+                    onChange={(e) => setSpecsForm({...specsForm, storageSize: e.target.value})}
+                    className="w-full h-10 px-3 py-2 bg-white border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
+              </div>
+              
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">GPU (Optional)</label>
+                <input
+                  type="text"
+                  placeholder="e.g., NVIDIA GTX 1650"
+                  value={specsForm.gpu}
+                  onChange={(e) => setSpecsForm({...specsForm, gpu: e.target.value})}
+                  className="w-full h-10 px-3 py-2 bg-white border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+              
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">IP Address</label>
+                  <input
+                    type="text"
+                    placeholder="e.g., 192.168.1.100"
+                    value={specsForm.ipAddress}
+                    onChange={(e) => setSpecsForm({...specsForm, ipAddress: e.target.value})}
+                    className="w-full h-10 px-3 py-2 bg-white border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">MAC Address</label>
+                  <input
+                    type="text"
+                    placeholder="e.g., 00:1A:2B:3C:4D:5E"
+                    value={specsForm.macAddress}
+                    onChange={(e) => setSpecsForm({...specsForm, macAddress: e.target.value})}
+                    className="w-full h-10 px-3 py-2 bg-white border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
+              </div>
+              
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">OS Version</label>
+                <input
+                  type="text"
+                  placeholder="e.g., Windows 10 Pro"
+                  value={specsForm.osVersion}
+                  onChange={(e) => setSpecsForm({...specsForm, osVersion: e.target.value})}
+                  className="w-full h-10 px-3 py-2 bg-white border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+            </div>
+            
+            <div className="p-6 border-t border-gray-200 flex justify-end space-x-3">
+              <button 
+                className="h-10 px-4 py-2 bg-white border border-gray-300 text-gray-700 rounded-md text-sm font-medium hover:bg-gray-50"
+                onClick={() => setEditSpecsModal(null)}
+              >
+                Cancel
+              </button>
+              <button 
+                className="flex items-center h-10 px-4 py-2 bg-blue-600 text-white rounded-md text-sm font-medium hover:bg-blue-700"
+                onClick={handleSaveSpecs}
+              >
+                <CheckCircle className="w-4 h-4 mr-2" />
+                Save Specifications
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Software Modal */}
+      {softwareModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg shadow-xl w-full max-w-lg mx-4 max-h-[80vh] overflow-hidden">
+            <div className="p-6 border-b border-gray-200">
+              <div className="flex items-center justify-between">
+                <h2 className="text-xl font-bold text-gray-900 flex items-center gap-2">
+                  <Package className="w-5 h-5" />
+                  Installed Software
+                </h2>
+                <button 
+                  onClick={() => setSoftwareModal(null)}
+                  className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+                >
+                  <X className="w-5 h-5 text-gray-500" />
+                </button>
+              </div>
+              <p className="text-sm text-gray-500 mt-1">{softwareModal.name} - {softwareModal.lab}</p>
+            </div>
+            
+            <div className="p-6 overflow-y-auto max-h-[50vh]">
+              {/* Add Software Form */}
+              <div className="mb-4 p-4 bg-gray-50 rounded-lg">
+                <h4 className="text-sm font-medium text-gray-700 mb-3">Add Software</h4>
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    placeholder="Software name"
+                    value={newSoftware.name}
+                    onChange={(e) => setNewSoftware({...newSoftware, name: e.target.value})}
+                    className="flex-1 h-10 px-3 py-2 bg-white border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                  <input
+                    type="text"
+                    placeholder="Version (optional)"
+                    value={newSoftware.version}
+                    onChange={(e) => setNewSoftware({...newSoftware, version: e.target.value})}
+                    className="w-32 h-10 px-3 py-2 bg-white border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                  <button
+                    onClick={handleAddSoftware}
+                    className="h-10 px-4 py-2 bg-blue-600 text-white rounded-md text-sm font-medium hover:bg-blue-700 flex items-center"
+                  >
+                    <Plus className="w-4 h-4 mr-1" />
+                    Add
+                  </button>
+                </div>
+              </div>
+
+              {/* Software List */}
+              {softwareList.length === 0 ? (
+                <div className="text-center py-8 text-gray-500">
+                  <Package className="w-12 h-12 mx-auto mb-3 text-gray-300" />
+                  <p>No software recorded for this computer.</p>
+                  <p className="text-sm text-gray-400 mt-1">Add software using the form above.</p>
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  {softwareList.map((software) => (
+                    <div key={software.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                      <div>
+                        <p className="font-medium text-gray-900">{software.softwareName}</p>
+                        <p className="text-xs text-gray-500">
+                          {software.version && `Version: ${software.version} • `}
+                          Installed: {new Date(software.installedAt).toLocaleDateString()}
+                        </p>
+                      </div>
+                      <button
+                        onClick={() => handleRemoveSoftware(software.id)}
+                        className="p-2 hover:bg-red-100 rounded-lg transition-colors"
+                        title="Remove software"
+                      >
+                        <Trash2 className="w-4 h-4 text-red-500" />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+            
+            <div className="p-6 border-t border-gray-200 flex justify-end">
+              <button 
+                className="h-10 px-4 py-2 bg-white border border-gray-300 text-gray-700 rounded-md text-sm font-medium hover:bg-gray-50"
+                onClick={() => setSoftwareModal(null)}
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Bulk Edit Modal */}
+      {bulkEditModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg shadow-xl w-full max-w-lg mx-4">
+            <div className="p-6 border-b border-gray-200">
+              <div className="flex items-center justify-between">
+                <h2 className="text-xl font-bold text-gray-900 flex items-center gap-2">
+                  <Settings className="w-5 h-5" />
+                  Bulk Update Specs
+                </h2>
+                <button 
+                  onClick={() => setBulkEditModal(false)}
+                  className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+                >
+                  <X className="w-5 h-5 text-gray-500" />
+                </button>
+              </div>
+              <p className="text-sm text-gray-500 mt-1">
+                Update specifications for {selectedComputers.length} selected computers
+              </p>
+            </div>
+            
+            <div className="p-6 space-y-4">
+              <div className="p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
+                <p className="text-sm text-yellow-800">
+                  <strong>Note:</strong> Only fill in the fields you want to update. 
+                  Leave others blank to keep existing values.
+                </p>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Processor</label>
+                  <input
+                    type="text"
+                    placeholder="e.g., Intel Core i7"
+                    value={specsForm.processor}
+                    onChange={(e) => setSpecsForm({...specsForm, processor: e.target.value})}
+                    className="w-full h-10 px-3 py-2 bg-white border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">RAM</label>
+                  <input
+                    type="text"
+                    placeholder="e.g., 16GB"
+                    value={specsForm.ram}
+                    onChange={(e) => setSpecsForm({...specsForm, ram: e.target.value})}
+                    className="w-full h-10 px-3 py-2 bg-white border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
+              </div>
+              
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Storage Type</label>
+                  <select
+                    value={specsForm.storageType}
+                    onChange={(e) => setSpecsForm({...specsForm, storageType: e.target.value})}
+                    className="w-full h-10 px-3 py-2 bg-white border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  >
+                    <option value="">-- Keep existing --</option>
+                    <option value="SSD">SSD</option>
+                    <option value="HDD">HDD</option>
+                    <option value="NVMe">NVMe SSD</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Storage Size</label>
+                  <input
+                    type="text"
+                    placeholder="e.g., 512GB"
+                    value={specsForm.storageSize}
+                    onChange={(e) => setSpecsForm({...specsForm, storageSize: e.target.value})}
+                    className="w-full h-10 px-3 py-2 bg-white border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
+              </div>
+              
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">GPU</label>
+                <input
+                  type="text"
+                  placeholder="e.g., NVIDIA GTX 1650"
+                  value={specsForm.gpu}
+                  onChange={(e) => setSpecsForm({...specsForm, gpu: e.target.value})}
+                  className="w-full h-10 px-3 py-2 bg-white border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+              
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">OS Version</label>
+                <input
+                  type="text"
+                  placeholder="e.g., Windows 10 Pro"
+                  value={specsForm.osVersion}
+                  onChange={(e) => setSpecsForm({...specsForm, osVersion: e.target.value})}
+                  className="w-full h-10 px-3 py-2 bg-white border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+            </div>
+            
+            <div className="p-6 border-t border-gray-200 flex justify-end space-x-3">
+              <button 
+                className="h-10 px-4 py-2 bg-white border border-gray-300 text-gray-700 rounded-md text-sm font-medium hover:bg-gray-50"
+                onClick={() => setBulkEditModal(false)}
+              >
+                Cancel
+              </button>
+              <button 
+                className="flex items-center h-10 px-4 py-2 bg-blue-600 text-white rounded-md text-sm font-medium hover:bg-blue-700"
+                onClick={handleBulkUpdate}
+              >
+                <CheckCircle className="w-4 h-4 mr-2" />
+                Update {selectedComputers.length} Computers
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Clone Specs Modal */}
+      {cloneModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg shadow-xl w-full max-w-2xl mx-4 max-h-[80vh] overflow-hidden">
+            <div className="p-6 border-b border-gray-200">
+              <div className="flex items-center justify-between">
+                <h2 className="text-xl font-bold text-gray-900 flex items-center gap-2">
+                  <Copy className="w-5 h-5" />
+                  Clone Specifications
+                </h2>
+                <button 
+                  onClick={() => setCloneModal(null)}
+                  className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+                >
+                  <X className="w-5 h-5 text-gray-500" />
+                </button>
+              </div>
+              <p className="text-sm text-gray-500 mt-1">
+                Copy specs from <strong>{cloneModal.source.name}</strong> to other computers
+              </p>
+            </div>
+            
+            <div className="p-6 overflow-y-auto max-h-[50vh]">
+              {/* Source Specs Preview */}
+              <div className="mb-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                <h4 className="text-sm font-semibold text-blue-900 mb-2">Source Specifications</h4>
+                <div className="grid grid-cols-2 gap-2 text-sm">
+                  {cloneModal.source.processor && (
+                    <div><span className="text-blue-700">CPU:</span> {cloneModal.source.processor}</div>
+                  )}
+                  {cloneModal.source.ram && (
+                    <div><span className="text-blue-700">RAM:</span> {cloneModal.source.ram}</div>
+                  )}
+                  {cloneModal.source.storageType && (
+                    <div><span className="text-blue-700">Storage:</span> {cloneModal.source.storageType} {cloneModal.source.storageSize}</div>
+                  )}
+                  {cloneModal.source.gpu && (
+                    <div><span className="text-blue-700">GPU:</span> {cloneModal.source.gpu}</div>
+                  )}
+                  {cloneModal.source.osVersion && (
+                    <div><span className="text-blue-700">OS:</span> {cloneModal.source.osVersion}</div>
+                  )}
+                </div>
+              </div>
+
+              {/* Target Selection */}
+              <h4 className="text-sm font-medium text-gray-700 mb-3">Select Target Computers</h4>
+              <div className="space-y-2">
+                {computers
+                  .filter(c => c.id !== cloneModal.source.id && c.labId === cloneModal.source.labId)
+                  .map((computer) => (
+                    <label key={computer.id} className="flex items-center p-3 bg-gray-50 rounded-lg cursor-pointer hover:bg-gray-100">
+                      <input
+                        type="checkbox"
+                        checked={cloneModal.targets.includes(computer.id)}
+                        onChange={(e) => {
+                          if (e.target.checked) {
+                            setCloneModal({...cloneModal, targets: [...cloneModal.targets, computer.id]});
+                          } else {
+                            setCloneModal({...cloneModal, targets: cloneModal.targets.filter(id => id !== computer.id)});
+                          }
+                        }}
+                        className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                      />
+                      <span className="ml-3 font-medium text-gray-900">{computer.name}</span>
+                      <span className="ml-2 text-sm text-gray-500">({computer.lab})</span>
+                    </label>
+                  ))}
+              </div>
+              
+              {computers.filter(c => c.id !== cloneModal.source.id && c.labId === cloneModal.source.labId).length === 0 && (
+                <div className="text-center py-4 text-gray-500">
+                  <p>No other computers in this lab to clone to.</p>
+                </div>
+              )}
+            </div>
+            
+            <div className="p-6 border-t border-gray-200 flex justify-end space-x-3">
+              <button 
+                className="h-10 px-4 py-2 bg-white border border-gray-300 text-gray-700 rounded-md text-sm font-medium hover:bg-gray-50"
+                onClick={() => setCloneModal(null)}
+              >
+                Cancel
+              </button>
+              <button 
+                className="flex items-center h-10 px-4 py-2 bg-green-600 text-white rounded-md text-sm font-medium hover:bg-green-700 disabled:opacity-50"
+                onClick={handleCloneSpecs}
+                disabled={cloneModal.targets.length === 0}
+              >
+                <Copy className="w-4 h-4 mr-2" />
+                Clone to {cloneModal.targets.length} Computers
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>

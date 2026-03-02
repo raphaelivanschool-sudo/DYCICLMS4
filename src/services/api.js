@@ -58,7 +58,19 @@ export const computersApi = {
   update: (id, data) => api.put(`/api/computers/${id}`, data),
   
   // Delete computer
-  delete: (id) => api.delete(`/api/computers/${id}`)
+  delete: (id) => api.delete(`/api/computers/${id}`),
+  
+  // Get software installed on a computer
+  getSoftware: (id) => api.get(`/api/computers/${id}/software`),
+  
+  // Add software to a computer
+  addSoftware: (id, data) => api.post(`/api/computers/${id}/software`, data),
+  
+  // Remove software from a computer
+  removeSoftware: (computerId, softwareId) => api.delete(`/api/computers/${computerId}/software/${softwareId}`),
+  
+  // Bulk update computers
+  bulkUpdate: (computerIds, specs) => api.post('/api/computers/bulk-update', { computerIds, specs })
 };
 
 // Dashboard API

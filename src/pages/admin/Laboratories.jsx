@@ -1,19 +1,20 @@
 import { useState, useEffect } from 'react';
 import { labsApi, usersApi } from '../../services/api.js';
-import {
-  Plus,
-  Search,
-  Edit2,
-  Trash2,
-  X,
-  Save,
-  Users,
-  Monitor,
-  AlertCircle,
-  CheckCircle,
-  Loader2,
-  Eye,
-  LayoutGrid
+import { 
+  Users, 
+  Search, 
+  Plus, 
+  Monitor, 
+  Edit2, 
+  Trash2, 
+  X, 
+  Save, 
+  Loader2, 
+  AlertCircle, 
+  CheckCircle, 
+  Eye, 
+  LayoutGrid,
+  Clock
 } from 'lucide-react';
 
 // Inline Badge component
@@ -30,6 +31,20 @@ const Badge = ({ variant, children }) => {
       {children}
     </span>
   );
+};
+
+// Hardcoded building options - reusable constant
+const BUILDING_OPTIONS = [
+  { value: 'Building A', label: 'Building A' },
+  { value: 'Building B', label: 'Building B' }
+];
+
+// Hardcoded schedule configuration
+const SCHEDULE_CONFIG = {
+  'Monday': {
+    '13:00-15:00': { instructor: 'Mr. Alberto Cruz', class: 'BSIT 3A', subjectCode: 'AIA 313' },
+    '16:00-17:00': { instructor: 'Mr. Jeremy Agapito', class: 'BSIT 3A', subjectCode: 'FRE 213' }
+  }
 };
 
 // Toast notification component
@@ -79,11 +94,17 @@ function Laboratories() {
   const [formData, setFormData] = useState({
     name: '',
     location: '',
+    building: '',
     roomNumber: '',
     capacity: '',
     computerCount: '',
     status: 'ACTIVE',
-    assignedInstructorId: ''
+    assignedInstructorId: '',
+    // Schedule fields
+    scheduleDay: '',
+    scheduleTimeSlot: '',
+    scheduleClass: '',
+    scheduleSubjectCode: ''
   });
 
   // Fetch labs and instructors on mount
@@ -121,11 +142,16 @@ function Laboratories() {
     setFormData({
       name: '',
       location: '',
+      building: '',
       roomNumber: '',
       capacity: '',
       computerCount: '',
       status: 'ACTIVE',
-      assignedInstructorId: ''
+      assignedInstructorId: '',
+      scheduleDay: '',
+      scheduleTimeSlot: '',
+      scheduleClass: '',
+      scheduleSubjectCode: ''
     });
     setModalError(null);
     setShowModal(true);
@@ -137,11 +163,16 @@ function Laboratories() {
     setFormData({
       name: lab.name || '',
       location: lab.location || '',
+      building: lab.building || '',
       roomNumber: lab.roomNumber || '',
       capacity: lab.capacity || '',
       computerCount: lab.computerCount || 0,
       status: lab.status || 'ACTIVE',
-      assignedInstructorId: lab.assignedInstructor?.id?.toString() || ''
+      assignedInstructorId: lab.assignedInstructor?.id?.toString() || '',
+      scheduleDay: lab.scheduleDay || '',
+      scheduleTimeSlot: lab.scheduleTimeSlot || '',
+      scheduleClass: lab.scheduleClass || '',
+      scheduleSubjectCode: lab.scheduleSubjectCode || ''
     });
     setModalError(null);
     setShowModal(true);
@@ -156,10 +187,28 @@ function Laboratories() {
 
   const handleInputChange = (e) => {
     const { name, value } = e.target;
-    setFormData(prev => ({
-      ...prev,
-      [name]: value
-    }));
+    setFormData(prev => {
+      const newData = { ...prev, [name]: value };
+      
+      // Auto-populate instructor based on day and time slot
+      if (name === 'scheduleDay' || name === 'scheduleTimeSlot') {
+        const day = name === 'scheduleDay' ? value : prev.scheduleDay;
+        const timeSlot = name === 'scheduleTimeSlot' ? value : prev.scheduleTimeSlot;
+        
+        if (day && timeSlot && SCHEDULE_CONFIG[day] && SCHEDULE_CONFIG[day][timeSlot]) {
+          const schedule = SCHEDULE_CONFIG[day][timeSlot];
+          newData.scheduleClass = schedule.class;
+          newData.scheduleSubjectCode = schedule.subjectCode;
+          // Find instructor by name and set ID
+          const instructor = instructors.find(inst => inst.fullName === schedule.instructor);
+          if (instructor) {
+            newData.assignedInstructorId = instructor.id.toString();
+          }
+        }
+      }
+      
+      return newData;
+    });
   };
 
   const handleSubmit = async () => {
@@ -186,11 +235,17 @@ function Laboratories() {
       const payload = {
         name: formData.name.trim(),
         location: formData.location.trim() || null,
+        building: formData.building || null,
         roomNumber: formData.roomNumber.trim() || formData.name.trim(),
         capacity: parseInt(formData.capacity),
         status: formData.status,
         assignedInstructorId: formData.assignedInstructorId || null,
-        computerCount: parseInt(formData.computerCount)
+        computerCount: parseInt(formData.computerCount),
+        // Schedule fields
+        scheduleDay: formData.scheduleDay || null,
+        scheduleTimeSlot: formData.scheduleTimeSlot || null,
+        scheduleClass: formData.scheduleClass || null,
+        scheduleSubjectCode: formData.scheduleSubjectCode || null
       };
 
       if (modalMode === 'add') {
@@ -391,8 +446,11 @@ function Laboratories() {
                 <div className="flex items-start justify-between">
                   <div>
                     <h3 className="text-lg font-semibold text-gray-900">{lab.name}</h3>
-                    {lab.location && (
-                      <p className="text-sm text-gray-500">{lab.location}</p>
+                    {lab.building && (
+                      <p className="text-sm text-gray-500">{lab.building}</p>
+                    )}
+                    {lab.roomNumber && (
+                      <p className="text-xs text-gray-400">Room {lab.roomNumber}</p>
                     )}
                   </div>
                   <div className="flex items-center gap-1">
@@ -500,19 +558,28 @@ function Laboratories() {
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Location</label>
-                <input
-                  type="text"
-                  name="location"
-                  placeholder="e.g., Building A, 2nd Floor"
-                  value={formData.location}
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Building <span className="text-red-500">*</span>
+                </label>
+                <select
+                  name="building"
+                  value={formData.building}
                   onChange={handleInputChange}
-                  className="w-full h-10 px-3 py-2 bg-white border border-gray-300 rounded-md text-sm placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                />
+                  className="w-full h-10 px-3 py-2 bg-white border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                >
+                  <option value="">-- Select Building --</option>
+                  {BUILDING_OPTIONS.map(option => (
+                    <option key={option.value} value={option.value}>
+                      {option.label}
+                    </option>
+                  ))}
+                </select>
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Room Number</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Room Number <span className="text-red-500">*</span>
+                </label>
                 <input
                   type="text"
                   name="roomNumber"
@@ -596,12 +663,18 @@ function Laboratories() {
                   </select>
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Assigned Instructor</label>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Assigned Instructor
+                    {formData.assignedInstructorId && (
+                      <span className="text-xs text-green-600 ml-1">(Auto-assigned)</span>
+                    )}
+                  </label>
                   <select
                     name="assignedInstructorId"
                     value={formData.assignedInstructorId}
                     onChange={handleInputChange}
-                    className="w-full h-10 px-3 py-2 bg-white border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    disabled={!!formData.scheduleDay && !!formData.scheduleTimeSlot}
+                    className="w-full h-10 px-3 py-2 bg-white border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-gray-100"
                   >
                     <option value="">-- Unassigned --</option>
                     {instructors.map(inst => (
@@ -611,6 +684,66 @@ function Laboratories() {
                     ))}
                   </select>
                 </div>
+              </div>
+
+              {/* Schedule Section */}
+              <div className="border-t border-gray-200 pt-4 mt-4">
+                <h4 className="text-sm font-semibold text-gray-900 mb-3 flex items-center gap-2">
+                  <Clock className="w-4 h-4" />
+                  Schedule-Based Assignment
+                </h4>
+                <p className="text-xs text-gray-500 mb-3">
+                  Select day and time to auto-assign instructor based on schedule
+                </p>
+                
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Day</label>
+                    <select
+                      name="scheduleDay"
+                      value={formData.scheduleDay}
+                      onChange={handleInputChange}
+                      className="w-full h-10 px-3 py-2 bg-white border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    >
+                      <option value="">-- Select Day --</option>
+                      <option value="Monday">Monday</option>
+                      <option value="Tuesday">Tuesday</option>
+                      <option value="Wednesday">Wednesday</option>
+                      <option value="Thursday">Thursday</option>
+                      <option value="Friday">Friday</option>
+                      <option value="Saturday">Saturday</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Time Slot</label>
+                    <select
+                      name="scheduleTimeSlot"
+                      value={formData.scheduleTimeSlot}
+                      onChange={handleInputChange}
+                      className="w-full h-10 px-3 py-2 bg-white border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    >
+                      <option value="">-- Select Time --</option>
+                      <option value="13:00-15:00">1:00 PM - 3:00 PM</option>
+                      <option value="16:00-17:00">4:00 PM - 5:00 PM</option>
+                    </select>
+                  </div>
+                </div>
+
+                {/* Auto-populated Schedule Info */}
+                {formData.scheduleClass && formData.scheduleSubjectCode && (
+                  <div className="mt-3 p-3 bg-green-50 border border-green-200 rounded-lg">
+                    <div className="grid grid-cols-2 gap-2 text-sm">
+                      <div>
+                        <span className="text-gray-500">Class:</span>
+                        <span className="ml-1 font-medium text-gray-900">{formData.scheduleClass}</span>
+                      </div>
+                      <div>
+                        <span className="text-gray-500">Subject:</span>
+                        <span className="ml-1 font-medium text-gray-900">{formData.scheduleSubjectCode}</span>
+                      </div>
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
             

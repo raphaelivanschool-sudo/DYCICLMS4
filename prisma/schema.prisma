@@ -24,16 +24,23 @@ model User {
   messages       Message[]
   sentMessages   Message[] @relation("SentMessages")
   assignedLaboratories Laboratory[]
+  labSchedules   LabSchedule[]
 }
 
 model Laboratory {
   id          Int      @id @default(autoincrement())
   name        String
   location    String?
+  building    String?  // Building A, Building B, etc.
   roomNumber  String
   capacity    Int
   status      LabStatus @default(ACTIVE)
   assignedInstructorId Int?
+  // Schedule-based assignment fields
+  scheduleDay     String?  // Monday, Tuesday, etc.
+  scheduleTimeSlot String? // 1:00 PM - 3:00 PM, etc.
+  scheduleClass   String?  // BSIT 3A, etc.
+  scheduleSubjectCode String? // AIA 313, etc.
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
@@ -41,6 +48,7 @@ model Laboratory {
   computers  Computer[]
   sessions   Session[]
   assignedInstructor User? @relation(fields: [assignedInstructorId], references: [id])
+  schedules  LabSchedule[]
 }
 
 model Computer {
@@ -55,9 +63,18 @@ model Computer {
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
 
+  // Hardware Specifications
+  processor       String?  // CPU model
+  ram             String?  // RAM size (e.g., "16GB")
+  storageType     String?  // SSD or HDD
+  storageSize     String?  // Storage size (e.g., "512GB")
+  gpu             String?  // GPU model (optional)
+  osVersion       String?  // Operating System version
+  
   // Relations
   laboratory Laboratory @relation(fields: [laboratoryId], references: [id], onDelete: Cascade)
   sessionStudents SessionStudent[]
+  software  ComputerSoftware[]
 }
 
 model Session {
@@ -194,4 +211,37 @@ enum InventoryStatus {
   ACTIVE
   INACTIVE
   DEPLETED
+}
+
+// Lab Schedule for instructor assignments
+model LabSchedule {
+  id              Int      @id @default(autoincrement())
+  laboratoryId    Int
+  day             String   // Monday, Tuesday, etc.
+  startTime       String   // 13:00 (24-hour format)
+  endTime         String   // 15:00 (24-hour format)
+  instructorId    Int
+  className       String   // BSIT 3A, etc.
+  subjectCode     String   // AIA 313, etc.
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  // Relations
+  laboratory      Laboratory @relation(fields: [laboratoryId], references: [id], onDelete: Cascade)
+  instructor      User       @relation(fields: [instructorId], references: [id])
+}
+
+// Computer Software tracking
+model ComputerSoftware {
+  id              Int      @id @default(autoincrement())
+  computerId      Int
+  softwareName    String
+  version         String?
+  installedAt     DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  // Relations
+  computer        Computer   @relation(fields: [computerId], references: [id], onDelete: Cascade)
+
+  @@unique([computerId, softwareName])
 }

@@ -55,13 +55,19 @@ router.get('/', async (req, res) => {
       id: lab.id,
       name: lab.name,
       location: lab.location,
+      building: lab.building,
       roomNumber: lab.roomNumber,
       capacity: lab.capacity,
       status: lab.status,
       createdAt: lab.createdAt,
       assignedInstructor: lab.assignedInstructor,
       computerCount: lab._count.computers,
-      computers: lab.computers
+      computers: lab.computers,
+      // Schedule fields
+      scheduleDay: lab.scheduleDay,
+      scheduleTimeSlot: lab.scheduleTimeSlot,
+      scheduleClass: lab.scheduleClass,
+      scheduleSubjectCode: lab.scheduleSubjectCode
     }));
 
     res.json(formattedLabs);
@@ -113,7 +119,8 @@ router.get('/:id', async (req, res) => {
 // POST /api/labs - Create new lab with computers
 router.post('/', async (req, res) => {
   try {
-    const { name, location, roomNumber, capacity, status, assignedInstructorId, computerCount } = req.body;
+    const { name, location, building, roomNumber, capacity, status, assignedInstructorId, computerCount, 
+      scheduleDay, scheduleTimeSlot, scheduleClass, scheduleSubjectCode } = req.body;
 
     // Validation
     if (!name || name.trim() === '') {
@@ -153,10 +160,16 @@ router.post('/', async (req, res) => {
         data: {
           name: name.trim(),
           location: location?.trim() || null,
+          building: building || null,
           roomNumber: roomNumber?.trim() || name.trim(),
           capacity: parseInt(capacity),
           status: status || 'ACTIVE',
-          assignedInstructorId: assignedInstructorId ? parseInt(assignedInstructorId) : null
+          assignedInstructorId: assignedInstructorId ? parseInt(assignedInstructorId) : null,
+          // Schedule fields
+          scheduleDay: scheduleDay || null,
+          scheduleTimeSlot: scheduleTimeSlot || null,
+          scheduleClass: scheduleClass || null,
+          scheduleSubjectCode: scheduleSubjectCode || null
         },
         include: {
           assignedInstructor: {
@@ -213,7 +226,8 @@ router.put('/:id', async (req, res) => {
       return res.status(400).json({ message: 'Invalid lab ID' });
     }
 
-    const { name, location, roomNumber, capacity, status, assignedInstructorId, computerCount } = req.body;
+    const { name, location, building, roomNumber, capacity, status, assignedInstructorId, computerCount,
+      scheduleDay, scheduleTimeSlot, scheduleClass, scheduleSubjectCode } = req.body;
 
     // Check if lab exists
     const existingLab = await prisma.laboratory.findUnique({
@@ -297,12 +311,18 @@ router.put('/:id', async (req, res) => {
     const updateData = {};
     if (name !== undefined) updateData.name = name.trim();
     if (location !== undefined) updateData.location = location?.trim() || null;
+    if (building !== undefined) updateData.building = building || null;
     if (roomNumber !== undefined) updateData.roomNumber = roomNumber?.trim() || null;
     if (capacity !== undefined) updateData.capacity = parseInt(capacity);
     if (status !== undefined) updateData.status = status;
     if (assignedInstructorId !== undefined) {
       updateData.assignedInstructorId = assignedInstructorId ? parseInt(assignedInstructorId) : null;
     }
+    // Schedule fields
+    if (scheduleDay !== undefined) updateData.scheduleDay = scheduleDay || null;
+    if (scheduleTimeSlot !== undefined) updateData.scheduleTimeSlot = scheduleTimeSlot || null;
+    if (scheduleClass !== undefined) updateData.scheduleClass = scheduleClass || null;
+    if (scheduleSubjectCode !== undefined) updateData.scheduleSubjectCode = scheduleSubjectCode || null;
 
     // Update the lab
     const updatedLab = await prisma.laboratory.update({
