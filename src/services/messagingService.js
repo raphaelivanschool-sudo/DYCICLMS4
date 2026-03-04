@@ -1,207 +1,306 @@
-// Mock messaging service - in real app, this would connect to a backend API
+import api from './api';
+import socketService from './socketService';
+
 class MessagingService {
   constructor() {
-    this.conversations = [
-      {
-        id: 1,
-        name: 'Mr. Cruz',
-        role: 'Instructor',
-        avatar: 'MC',
-        lastMessage: 'Please submit your lab assignment by tomorrow.',
-        time: '10:30 AM',
-        unread: 2,
-        online: true,
-        typing: false,
-        userId: 'instructor_1'
-      },
-      {
-        id: 2,
-        name: 'Student 02',
-        role: 'Classmate',
-        avatar: 'S2',
-        lastMessage: 'Hey, can you help me with the coding exercise?',
-        time: '9:45 AM',
-        unread: 1,
-        online: true,
-        typing: false,
-        userId: 'student_2'
-      },
-      {
-        id: 3,
-        name: 'Student 03',
-        role: 'Classmate',
-        avatar: 'S3',
-        lastMessage: 'Thanks for the notes!',
-        time: 'Yesterday',
-        unread: 0,
-        online: false,
-        typing: false,
-        userId: 'student_3'
-      },
-      {
-        id: 4,
-        name: 'Lab Assistant',
-        role: 'Support',
-        avatar: 'LA',
-        lastMessage: 'The lab will be closed for maintenance on Friday.',
-        time: 'Yesterday',
-        unread: 0,
-        online: false,
-        typing: false,
-        userId: 'support_1'
-      },
-      {
-        id: 5,
-        name: 'Admin',
-        role: 'Administrator',
-        avatar: 'AD',
-        lastMessage: 'System maintenance scheduled for tonight.',
-        time: '2 days ago',
-        unread: 0,
-        online: true,
-        typing: false,
-        userId: 'admin_1'
-      }
-    ];
+    this.conversations = [];
+    this.messageListeners = [];
+    this.typingListeners = [];
+    this.statusListeners = [];
+    this.connectionListeners = [];
+    this.initialized = false;
+  }
 
-    this.messages = {
-      '1_2': [
-        { id: 1, senderId: 'current', senderName: 'Me', message: 'Good morning class!', time: '8:00 AM', isMe: true, read: true },
-        { id: 2, senderId: 'instructor_1', senderName: 'Mr. Cruz', message: 'Good morning everyone! Today we\'ll be working on the React project.', time: '8:05 AM', isMe: false, read: true },
-        { id: 3, senderId: 'current', senderName: 'Me', message: 'Great! I have some questions about the components.', time: '8:10 AM', isMe: true, read: true },
-        { id: 4, senderId: 'instructor_1', senderName: 'Mr. Cruz', message: 'Please submit your lab assignment by tomorrow.', time: '10:30 AM', isMe: false, read: false },
-      ],
-      '1_3': [
-        { id: 1, senderId: 'student_2', senderName: 'Student 02', message: 'Hey, can you help me with the coding exercise?', time: '9:45 AM', isMe: false, read: false },
-      ]
+  // Initialize socket connection
+  initialize() {
+    console.log('MessagingService initialize() called, current state:', { initialized: this.initialized });
+    if (!this.initialized) {
+      console.log('Initializing messaging service...');
+      try {
+        console.log('About to call socketService.connect()...');
+        socketService.connect();
+        console.log('socketService.connect() returned');
+      } catch (e) {
+        console.error('Error calling socketService.connect():', e);
+      }
+      
+      // Subscribe to socket events
+      socketService.on('new_message', (data) => {
+        console.log('New message received:', data);
+        this.notifyMessageListeners(data);
+      });
+
+      socketService.on('message_sent', (data) => {
+        console.log('Message sent confirmation:', data);
+        this.notifyMessageListeners({ ...data, isMe: true });
+      });
+
+      socketService.on('user_typing', (data) => {
+        this.notifyTypingListeners(data);
+      });
+
+      socketService.on('message_status_update', (data) => {
+        this.notifyStatusListeners(data);
+      });
+
+      socketService.on('user_offline', (data) => {
+        this.notifyStatusListeners({ type: 'offline', ...data });
+      });
+
+      socketService.on('connection_status', (data) => {
+        console.log('Connection status changed:', data);
+        this.notifyConnectionListeners(data);
+      });
+
+      socketService.on('connection_error', (error) => {
+        console.error('Socket connection error:', error);
+        this.notifyConnectionListeners({ connected: false, error: error.message });
+      });
+
+      this.initialized = true;
+    }
+  }
+
+  // Subscribe to new messages
+  onNewMessage(callback) {
+    this.messageListeners.push(callback);
+    return () => {
+      this.messageListeners = this.messageListeners.filter(cb => cb !== callback);
     };
   }
 
-  // Get conversations for a specific user role
-  async getConversations(userRole) {
-    // Simulate API delay
-    await new Promise(resolve => setTimeout(resolve, 500));
-    
-    // Filter conversations based on role permissions
-    let filteredConversations = [...this.conversations];
-    
-    if (userRole === 'student') {
-      // Students can message instructors and other students
-      filteredConversations = filteredConversations.filter(conv => 
-        conv.role === 'Instructor' || conv.role === 'Classmate' || conv.role === 'Support'
-      );
-    } else if (userRole === 'instructor') {
-      // Instructors can message students and other instructors
-      filteredConversations = filteredConversations.filter(conv => 
-        conv.role === 'Classmate' || conv.role === 'Administrator' || conv.role === 'Support'
-      );
-    }
-    // Admin can message everyone
-    
-    return filteredConversations;
+  notifyMessageListeners(data) {
+    this.messageListeners.forEach(cb => {
+      try {
+        cb(data);
+      } catch (error) {
+        console.error('Error in message listener:', error);
+      }
+    });
   }
 
-  // Get messages between current user and another user
-  async getMessages(currentUserId, otherUserId) {
-    await new Promise(resolve => setTimeout(resolve, 300));
-    
-    const conversationKey = [currentUserId, otherUserId].sort().join('_');
-    return this.messages[conversationKey] || [];
+  // Subscribe to typing indicators
+  onTyping(callback) {
+    this.typingListeners.push(callback);
+    return () => {
+      this.typingListeners = this.typingListeners.filter(cb => cb !== callback);
+    };
+  }
+
+  notifyTypingListeners(data) {
+    this.typingListeners.forEach(cb => {
+      try {
+        cb(data);
+      } catch (error) {
+        console.error('Error in typing listener:', error);
+      }
+    });
+  }
+
+  // Subscribe to status updates
+  onStatusUpdate(callback) {
+    this.statusListeners.push(callback);
+    return () => {
+      this.statusListeners = this.statusListeners.filter(cb => cb !== callback);
+    };
+  }
+
+  notifyStatusListeners(data) {
+    this.statusListeners.forEach(cb => {
+      try {
+        cb(data);
+      } catch (error) {
+        console.error('Error in status listener:', error);
+      }
+    });
+  }
+
+  // Subscribe to connection status
+  onConnectionStatus(callback) {
+    this.connectionListeners.push(callback);
+    return () => {
+      this.connectionListeners = this.connectionListeners.filter(cb => cb !== callback);
+    };
+  }
+
+  notifyConnectionListeners(data) {
+    this.connectionListeners.forEach(cb => {
+      try {
+        cb(data);
+      } catch (error) {
+        console.error('Error in connection listener:', error);
+      }
+    });
+  }
+
+  // Get all conversations
+  async getConversations() {
+    try {
+      const response = await api.get('/api/messaging/conversations');
+      this.conversations = response.data;
+      return response.data;
+    } catch (error) {
+      console.error('Error fetching conversations:', error);
+      throw error;
+    }
+  }
+
+  // Get messages with a specific user
+  async getMessages(userId) {
+    try {
+      const response = await api.get(`/api/messaging/messages/${userId}`);
+      return response.data;
+    } catch (error) {
+      console.error('Error fetching messages:', error);
+      throw error;
+    }
+  }
+
+  // Get group messages
+  async getGroupMessages(groupId) {
+    try {
+      const response = await api.get(`/api/messaging/group-messages/${groupId}`);
+      return response.data;
+    } catch (error) {
+      console.error('Error fetching group messages:', error);
+      throw error;
+    }
   }
 
   // Send a message
-  async sendMessage(currentUserId, recipientId, message) {
-    await new Promise(resolve => setTimeout(resolve, 200));
-    
-    const newMessage = {
-      id: Date.now(),
-      senderId: currentUserId,
-      senderName: 'Me',
-      message: message.trim(),
-      time: new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true }),
-      isMe: true,
-      read: false
-    };
+  async sendMessage(receiverId, content, attachments = null) {
+    try {
+      const response = await api.post('/api/messaging/send', {
+        receiverId,
+        content,
+        attachments
+      });
+      return response.data;
+    } catch (error) {
+      console.error('Error sending message:', error);
+      throw error;
+    }
+  }
 
-    const conversationKey = [currentUserId, recipientId].sort().join('_');
-    
-    if (!this.messages[conversationKey]) {
-      this.messages[conversationKey] = [];
+  // Send group message
+  async sendGroupMessage(groupId, content, attachments = null) {
+    try {
+      const response = await api.post('/api/messaging/send', {
+        groupId,
+        content,
+        attachments
+      });
+      return response.data;
+    } catch (error) {
+      console.error('Error sending group message:', error);
+      throw error;
     }
-    
-    this.messages[conversationKey].push(newMessage);
-    
-    // Update conversation's last message
-    const conversation = this.conversations.find(conv => conv.userId === recipientId);
-    if (conversation) {
-      conversation.lastMessage = message.trim();
-      conversation.time = 'Just now';
-    }
-    
-    return newMessage;
   }
 
   // Mark messages as read
-  async markAsRead(currentUserId, otherUserId) {
-    await new Promise(resolve => setTimeout(resolve, 100));
-    
-    const conversationKey = [currentUserId, otherUserId].sort().join('_');
-    const messages = this.messages[conversationKey] || [];
-    
-    messages.forEach(message => {
-      if (!message.isMe) {
-        message.read = true;
-      }
-    });
-    
-    // Clear unread count
-    const conversation = this.conversations.find(conv => conv.userId === otherUserId);
-    if (conversation) {
-      conversation.unread = 0;
+  async markAsRead(senderId) {
+    try {
+      await api.post('/api/messaging/mark-read', { senderId });
+    } catch (error) {
+      console.error('Error marking messages as read:', error);
+      throw error;
+    }
+  }
+
+  // Mark group messages as read
+  async markGroupAsRead(groupId) {
+    try {
+      await api.post('/api/messaging/mark-read', { groupId });
+    } catch (error) {
+      console.error('Error marking group messages as read:', error);
+      throw error;
+    }
+  }
+
+  // Get all users for starting conversations
+  async getUsers() {
+    try {
+      const response = await api.get('/api/messaging/users');
+      return response.data;
+    } catch (error) {
+      console.error('Error fetching users:', error);
+      throw error;
     }
   }
 
   // Search conversations
-  async searchConversations(query, userRole) {
-    await new Promise(resolve => setTimeout(resolve, 200));
-    
-    const conversations = await this.getConversations(userRole);
-    
-    if (!query.trim()) {
-      return conversations;
-    }
-    
-    const lowercaseQuery = query.toLowerCase();
-    return conversations.filter(conv => 
-      conv.name.toLowerCase().includes(lowercaseQuery) ||
-      conv.role.toLowerCase().includes(lowercaseQuery) ||
-      conv.lastMessage.toLowerCase().includes(lowercaseQuery)
-    );
-  }
-
-  // Get unread message count
-  async getUnreadCount(currentUserId) {
-    await new Promise(resolve => setTimeout(resolve, 100));
-    
-    return this.conversations
-      .filter(conv => conv.unread > 0)
-      .reduce((total, conv) => total + conv.unread, 0);
-  }
-
-  // Simulate typing indicator
-  setTyping(userId, isTyping) {
-    const conversation = this.conversations.find(conv => conv.userId === userId);
-    if (conversation) {
-      conversation.typing = isTyping;
+  async searchConversations(query) {
+    try {
+      const response = await api.get('/api/messaging/search', {
+        params: { query }
+      });
+      return response.data;
+    } catch (error) {
+      console.error('Error searching conversations:', error);
+      throw error;
     }
   }
 
-  // Simulate online status changes
-  setOnlineStatus(userId, isOnline) {
-    const conversation = this.conversations.find(conv => conv.userId === userId);
-    if (conversation) {
-      conversation.online = isOnline;
+  // Get unread count
+  async getUnreadCount() {
+    try {
+      const conversations = await this.getConversations();
+      return conversations.reduce((total, conv) => total + (conv.unread || 0), 0);
+    } catch (error) {
+      console.error('Error getting unread count:', error);
+      return 0;
     }
+  }
+
+  // Create a new group
+  async createGroup(name, description, memberIds) {
+    try {
+      const response = await api.post('/api/messaging/groups', {
+        name,
+        description,
+        memberIds
+      });
+      return response.data;
+    } catch (error) {
+      console.error('Error creating group:', error);
+      throw error;
+    }
+  }
+
+  // Get group details
+  async getGroupDetails(groupId) {
+    try {
+      const response = await api.get(`/api/messaging/groups/${groupId}`);
+      return response.data;
+    } catch (error) {
+      console.error('Error fetching group details:', error);
+      throw error;
+    }
+  }
+
+  // Send typing indicator
+  sendTyping(receiverId, isTyping = true) {
+    socketService.sendTyping(receiverId, isTyping);
+  }
+
+  // Send group typing indicator
+  sendGroupTyping(groupId, isTyping = true) {
+    socketService.sendGroupTyping(groupId, isTyping);
+  }
+
+  // Get user online status
+  async getUserStatus(userId) {
+    return new Promise((resolve) => {
+      socketService.getUserStatus(userId, (status) => {
+        resolve(status);
+      });
+    });
+  }
+
+  // Disconnect socket
+  disconnect() {
+    socketService.disconnect();
+    this.initialized = false;
   }
 }
 

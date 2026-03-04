@@ -25,6 +25,8 @@ model User {
   sentMessages   Message[] @relation("SentMessages")
   assignedLaboratories Laboratory[]
   labSchedules   LabSchedule[]
+  createdGroups  Group[]
+  groupMemberships GroupMember[]
 }
 
 model Laboratory {
@@ -141,12 +143,56 @@ model Message {
   content     String   @db.Text
   senderId    Int
   receiverId  Int?
+  groupId     Int?
   isBroadcast Boolean  @default(false)
+  status      MessageStatus @default(SENT)
+  attachments String?  @db.Text // JSON array of file URLs
   createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 
   // Relations
   sender      User     @relation("SentMessages", fields: [senderId], references: [id])
   receiver    User?    @relation(fields: [receiverId], references: [id])
+  group       Group?   @relation(fields: [groupId], references: [id])
+}
+
+model Group {
+  id          Int      @id @default(autoincrement())
+  name        String
+  description String?
+  createdBy   Int
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Relations
+  creator     User     @relation(fields: [createdBy], references: [id])
+  members     GroupMember[]
+  messages    Message[]
+}
+
+model GroupMember {
+  id        Int      @id @default(autoincrement())
+  groupId   Int
+  userId    Int
+  role      GroupRole @default(MEMBER)
+  joinedAt  DateTime @default(now())
+
+  // Relations
+  group     Group    @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  user      User     @relation(fields: [userId], references: [id])
+
+  @@unique([groupId, userId])
+}
+
+enum MessageStatus {
+  SENT
+  DELIVERED
+  READ
+}
+
+enum GroupRole {
+  ADMIN
+  MEMBER
 }
 
 model Inventory {
