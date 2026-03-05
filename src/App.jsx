@@ -24,6 +24,7 @@ import Messaging from './pages/instructor/Messaging';
 import StudentLayout from './components/layout/StudentLayout';
 import SessionDashboard from './pages/student/SessionDashboard';
 import SupportTicket from './pages/student/SupportTicket';
+import StudentMessaging from './pages/student/Messaging';
 
 function App() {
   return (
@@ -82,6 +83,7 @@ function App() {
           <Route index element={<Navigate to="dashboard" replace />} />
           <Route path="dashboard" element={<SessionDashboard />} />
           <Route path="tickets" element={<SupportTicket />} />
+          <Route path="messaging" element={<StudentMessaging />} />
         </Route>
 
         {/* Catch all - Redirect to login */}

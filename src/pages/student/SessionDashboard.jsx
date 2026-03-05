@@ -11,10 +11,7 @@ import {
   HelpCircle,
   FileText,
   ChevronRight,
-  MessageCircle,
-  X,
-  Send,
-  Search
+  MessageCircle
 } from 'lucide-react';
 import { mockStudentSession, mockAnnouncements } from '../../data/mockStudentData';
 
@@ -37,10 +34,6 @@ function SessionDashboard() {
   const [elapsedTime, setElapsedTime] = useState('00:00:00');
   const [currentTime, setCurrentTime] = useState(new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true }));
   const [currentDate, setCurrentDate] = useState(new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' }));
-  const [showChat, setShowChat] = useState(false);
-  const [selectedChat, setSelectedChat] = useState(null);
-  const [messageInput, setMessageInput] = useState('');
-  const [searchQuery, setSearchQuery] = useState('');
 
   // Timer - update elapsed time every second
   useEffect(() => {
@@ -66,67 +59,6 @@ function SessionDashboard() {
     
     return () => clearInterval(timer);
   }, [sessionStartTime]);
-
-  // Mock chat data
-  const mockChats = [
-    {
-      id: 1,
-      name: 'Mr. Cruz',
-      role: 'Instructor',
-      avatar: 'MC',
-      lastMessage: 'Please submit your lab assignment by tomorrow.',
-      time: '10:30 AM',
-      unread: 2,
-      online: true
-    },
-    {
-      id: 2,
-      name: 'Student 02',
-      role: 'Classmate',
-      avatar: 'S2',
-      lastMessage: 'Hey, can you help me with the coding exercise?',
-      time: '9:45 AM',
-      unread: 1,
-      online: true
-    },
-    {
-      id: 3,
-      name: 'Student 03',
-      role: 'Classmate',
-      avatar: 'S3',
-      lastMessage: 'Thanks for the notes!',
-      time: 'Yesterday',
-      unread: 0,
-      online: false
-    },
-    {
-      id: 4,
-      name: 'Lab Assistant',
-      role: 'Support',
-      avatar: 'LA',
-      lastMessage: 'The lab will be closed for maintenance on Friday.',
-      time: 'Yesterday',
-      unread: 0,
-      online: false
-    }
-  ];
-
-  const mockMessages = [
-    { id: 1, sender: 'Mr. Cruz', message: 'Good morning class!', time: '8:00 AM', isMe: false },
-    { id: 2, sender: 'Me', message: 'Good morning sir!', time: '8:05 AM', isMe: true },
-    { id: 3, sender: 'Mr. Cruz', message: 'Please submit your lab assignment by tomorrow.', time: '10:30 AM', isMe: false },
-  ];
-
-  const handleSendMessage = () => {
-    if (messageInput.trim()) {
-      setMessageInput('');
-    }
-  };
-
-  const filteredChats = mockChats.filter(chat => 
-    chat.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    chat.role.toLowerCase().includes(searchQuery.toLowerCase())
-  );
 
   return (
     <div className="max-w-7xl mx-auto">
@@ -211,10 +143,7 @@ function SessionDashboard() {
           </div>
 
           {/* Chats */}
-          <div 
-            onClick={() => setShowChat(true)}
-            className="bg-white rounded-xl border border-gray-200 p-5 shadow-sm text-center cursor-pointer hover:shadow-md transition-shadow relative"
-          >
+          <div className="bg-white rounded-xl border border-gray-200 p-5 shadow-sm text-center cursor-pointer hover:shadow-md transition-shadow relative">
             <div className="w-12 h-12 bg-purple-100 rounded-full flex items-center justify-center mx-auto mb-3">
               <MessageCircle className="w-6 h-6 text-purple-600" />
               <span className="absolute top-0 right-0 w-5 h-5 bg-red-500 text-white text-xs rounded-full flex items-center justify-center">3</span>
@@ -312,133 +241,6 @@ function SessionDashboard() {
           </div>
         </div>
       </div>
-
-      {/* Chat Modal */}
-      {showChat && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-xl w-full max-w-4xl h-[600px] flex">
-            {/* Chat List */}
-            <div className="w-1/3 border-r border-gray-200 flex flex-col">
-              <div className="p-4 border-b border-gray-200">
-                <div className="flex items-center justify-between mb-4">
-                  <h2 className="text-lg font-semibold text-gray-900">Chats</h2>
-                  <button onClick={() => setShowChat(false)}>
-                    <X className="w-5 h-5 text-gray-500" />
-                  </button>
-                </div>
-                <div className="relative">
-                  <Search className="w-4 h-4 text-gray-400 absolute left-3 top-2.5" />
-                  <input
-                    type="text"
-                    placeholder="Search chats..."
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    className="w-full pl-9 pr-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  />
-                </div>
-              </div>
-              <div className="flex-1 overflow-y-auto">
-                {filteredChats.map((chat) => (
-                  <div
-                    key={chat.id}
-                    onClick={() => setSelectedChat(chat)}
-                    className={`p-4 border-b border-gray-100 cursor-pointer hover:bg-gray-50 ${
-                      selectedChat?.id === chat.id ? 'bg-blue-50' : ''
-                    }`}
-                  >
-                    <div className="flex items-center">
-                      <div className="relative">
-                        <div className="w-10 h-10 bg-blue-500 rounded-full flex items-center justify-center text-white text-sm font-medium">
-                          {chat.avatar}
-                        </div>
-                        {chat.online && (
-                          <span className="absolute bottom-0 right-0 w-3 h-3 bg-green-500 rounded-full border-2 border-white"></span>
-                        )}
-                      </div>
-                      <div className="ml-3 flex-1">
-                        <div className="flex items-center justify-between">
-                          <p className="font-medium text-gray-900 text-sm">{chat.name}</p>
-                          <span className="text-xs text-gray-500">{chat.time}</span>
-                        </div>
-                        <p className="text-xs text-gray-500">{chat.role}</p>
-                        <p className="text-xs text-gray-600 truncate mt-1">{chat.lastMessage}</p>
-                      </div>
-                      {chat.unread > 0 && (
-                        <span className="w-5 h-5 bg-red-500 text-white text-xs rounded-full flex items-center justify-center">
-                          {chat.unread}
-                        </span>
-                      )}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            {/* Chat Window */}
-            <div className="flex-1 flex flex-col">
-              {selectedChat ? (
-                <>
-                  <div className="p-4 border-b border-gray-200 flex items-center">
-                    <div className="w-8 h-8 bg-blue-500 rounded-full flex items-center justify-center text-white text-sm font-medium mr-3">
-                      {selectedChat.avatar}
-                    </div>
-                    <div>
-                      <p className="font-medium text-gray-900">{selectedChat.name}</p>
-                      <p className="text-xs text-gray-500">{selectedChat.role}</p>
-                    </div>
-                  </div>
-                  <div className="flex-1 p-4 overflow-y-auto">
-                    {mockMessages.map((message) => (
-                      <div
-                        key={message.id}
-                        className={`mb-4 ${message.isMe ? 'text-right' : 'text-left'}`}
-                      >
-                        <div
-                          className={`inline-block max-w-xs px-4 py-2 rounded-lg ${
-                            message.isMe
-                              ? 'bg-blue-500 text-white'
-                              : 'bg-gray-100 text-gray-900'
-                          }`}
-                        >
-                          <p className="text-sm">{message.message}</p>
-                          <p className={`text-xs mt-1 ${message.isMe ? 'text-blue-100' : 'text-gray-500'}`}>
-                            {message.time}
-                          </p>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                  <div className="p-4 border-t border-gray-200">
-                    <div className="flex items-center">
-                      <input
-                        type="text"
-                        value={messageInput}
-                        onChange={(e) => setMessageInput(e.target.value)}
-                        onKeyPress={(e) => e.key === 'Enter' && handleSendMessage()}
-                        placeholder="Type a message..."
-                        className="flex-1 px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                      />
-                      <button
-                        onClick={handleSendMessage}
-                        className="ml-2 px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors"
-                      >
-                        <Send className="w-4 h-4" />
-                      </button>
-                    </div>
-                  </div>
-                </>
-              ) : (
-                <div className="flex-1 flex items-center justify-center">
-                  <div className="text-center">
-                    <MessageCircle className="w-12 h-12 text-gray-300 mx-auto mb-3" />
-                    <p className="text-gray-500">Select a chat to start messaging</p>
-                  </div>
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }

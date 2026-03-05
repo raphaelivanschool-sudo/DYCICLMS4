@@ -1,7 +1,5 @@
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { Outlet } from 'react-router-dom';
-import { useState } from 'react';
-import MessagingModule from '../messaging/MessagingModule';
 import {
   LayoutDashboard,
   Ticket,
@@ -15,22 +13,17 @@ import { mockStudentSession } from '../../data/mockStudentData';
 const navigation = [
   { name: 'Session Dashboard', href: '/student/dashboard', icon: LayoutDashboard },
   { name: 'Support Ticket', href: '/student/tickets', icon: Ticket },
-  { name: 'Chats', href: '/student/chats', icon: MessageCircle },
+  { name: 'Messaging', href: '/student/messaging', icon: MessageCircle },
 ];
 
 function StudentLayout() {
   const location = useLocation();
   const navigate = useNavigate();
-  const [showMessaging, setShowMessaging] = useState(false);
 
   const handleLogout = () => {
     // Clear all localStorage items
     localStorage.clear();
     navigate('/');
-  };
-
-  const handleChatsClick = () => {
-    setShowMessaging(true);
   };
 
   const getBreadcrumb = () => {
@@ -71,34 +64,19 @@ function StudentLayout() {
             {navigation.map((item) => {
               const isActive = location.pathname === item.href;
               const Icon = item.icon;
-              const isChats = item.name === 'Chats';
               return (
                 <li key={item.name}>
-                  {isChats ? (
-                    <button
-                      onClick={handleChatsClick}
-                      className={`flex items-center w-full px-3 py-2.5 rounded-md text-sm font-medium transition-colors ${
-                        showMessaging
-                          ? 'bg-[#ea580c] text-white'
-                          : 'text-slate-300 hover:bg-slate-800 hover:text-white'
-                      }`}
-                    >
-                      <Icon className={`w-4 h-4 mr-3 ${showMessaging ? 'text-white' : 'text-slate-400'}`} />
-                      {item.name}
-                    </button>
-                  ) : (
-                    <Link
-                      to={item.href}
-                      className={`flex items-center px-3 py-2.5 rounded-md text-sm font-medium transition-colors ${
-                        isActive
-                          ? 'bg-[#ea580c] text-white'
-                          : 'text-slate-300 hover:bg-slate-800 hover:text-white'
-                      }`}
-                    >
-                      <Icon className={`w-4 h-4 mr-3 ${isActive ? 'text-white' : 'text-slate-400'}`} />
-                      {item.name}
-                    </Link>
-                  )}
+                  <Link
+                    to={item.href}
+                    className={`flex items-center px-3 py-2.5 rounded-md text-sm font-medium transition-colors ${
+                      isActive
+                        ? 'bg-[#ea580c] text-white'
+                        : 'text-slate-300 hover:bg-slate-800 hover:text-white'
+                    }`}
+                  >
+                    <Icon className={`w-4 h-4 mr-3 ${isActive ? 'text-white' : 'text-slate-400'}`} />
+                    {item.name}
+                  </Link>
                 </li>
               );
             })}
@@ -152,14 +130,6 @@ function StudentLayout() {
           <Outlet />
         </main>
       </div>
-
-      {/* Messaging Module */}
-      <MessagingModule 
-        isOpen={showMessaging} 
-        onClose={() => setShowMessaging(false)} 
-        userRole="student"
-        currentUser={{ name: mockStudentSession.studentName, initials: mockStudentSession.studentInitials }}
-      />
     </div>
   );
 }
