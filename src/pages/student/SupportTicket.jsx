@@ -62,7 +62,6 @@ function SupportTicket() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    console.log('Form submitted with data:', formData);
     
     try {
       const ticketData = {
@@ -72,9 +71,7 @@ function SupportTicket() {
         description: formData.description
       };
 
-      console.log('Sending ticket data:', ticketData);
       const newTicket = await ticketService.createTicket(ticketData);
-      console.log('Ticket created:', newTicket);
       
       setTickets([newTicket, ...tickets]);
       

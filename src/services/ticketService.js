@@ -8,13 +8,10 @@ class TicketService {
   // Get auth token
   getAuthHeaders() {
     const token = localStorage.getItem('token');
-    console.log('Token from localStorage:', token ? 'exists' : 'missing');
-    const headers = {
+    return {
       'Content-Type': 'application/json',
       'Authorization': `Bearer ${token}`
     };
-    console.log('Auth headers:', headers);
-    return headers;
   }
 
   // Get all tickets for current user
@@ -79,28 +76,18 @@ class TicketService {
   // Create new ticket
   async createTicket(ticketData) {
     try {
-      console.log('Creating ticket with data:', ticketData);
-      console.log('API URL:', `${this.baseURL}/api/tickets`);
-      console.log('Auth headers:', this.getAuthHeaders());
-      
       const response = await fetch(`${this.baseURL}/api/tickets`, {
         method: 'POST',
         headers: this.getAuthHeaders(),
         body: JSON.stringify(ticketData)
       });
       
-      console.log('Response status:', response.status);
-      console.log('Response ok:', response.ok);
-      
       if (!response.ok) {
         const errorData = await response.json();
-        console.error('Error response:', errorData);
         throw new Error(errorData.error || 'Failed to create ticket');
       }
       
-      const result = await response.json();
-      console.log('Ticket created successfully:', result);
-      return result;
+      return await response.json();
     } catch (error) {
       console.error('Error creating ticket:', error);
       throw error;

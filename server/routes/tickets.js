@@ -184,18 +184,13 @@ router.get('/all', authenticateToken, async (req, res) => {
 // POST create new ticket
 router.post('/', authenticateToken, async (req, res) => {
   try {
-    console.log('Creating ticket with data:', req.body);
-    console.log('User from token:', req.user);
-    
     const { title, category, priority, description } = req.body;
 
     if (!title || !description) {
-      console.log('Missing required fields:', { title, description });
       return res.status(400).json({ error: 'Title and description are required' });
     }
 
     const ticketId = await generateTicketId();
-    console.log('Generated ticket ID:', ticketId);
 
     const ticket = await prisma.ticket.create({
       data: {
@@ -218,11 +213,10 @@ router.post('/', authenticateToken, async (req, res) => {
       }
     });
 
-    console.log('Ticket created successfully:', ticket);
     res.status(201).json(ticket);
   } catch (error) {
     console.error('Error creating ticket:', error);
-    res.status(500).json({ error: 'Failed to create ticket', details: error.message });
+    res.status(500).json({ error: 'Failed to create ticket' });
   }
 });
 
