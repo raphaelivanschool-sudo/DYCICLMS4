@@ -20,6 +20,8 @@ model User {
   // Relations
   sessions       Session[]
   tickets        Ticket[]
+  approvedTickets Ticket[] @relation("TicketApprover")
+  assignedTickets Ticket[] @relation("TicketAssignee")
   systemLogs     SystemLog[]
   messages       Message[]
   sentMessages   Message[] @relation("SentMessages")
@@ -112,18 +114,24 @@ model SessionStudent {
 
 model Ticket {
   id          Int      @id @default(autoincrement())
+  ticketId    String   @unique // Format: T-2025-001
   title       String
   description String   @db.Text
-  status      TicketStatus @default(OPEN)
+  status      TicketStatus @default(PENDING_APPROVAL)
   priority    TicketPriority @default(MEDIUM)
   category    String
   createdBy   Int
   assignedTo  Int?
+  approvedBy  Int?
+  approvedAt  DateTime?
+  rejectionReason String?
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
   // Relations
   creator     User     @relation(fields: [createdBy], references: [id])
+  assignee    User?    @relation("TicketAssignee", fields: [assignedTo], references: [id])
+  approver    User?    @relation("TicketApprover", fields: [approvedBy], references: [id])
 }
 
 model SystemLog {
@@ -240,6 +248,9 @@ enum StudentSessionStatus {
 }
 
 enum TicketStatus {
+  PENDING_APPROVAL
+  APPROVED
+  REJECTED
   OPEN
   IN_PROGRESS
   RESOLVED

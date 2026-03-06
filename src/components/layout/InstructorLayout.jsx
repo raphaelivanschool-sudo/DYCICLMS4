@@ -7,7 +7,8 @@ import {
   MessageCircle,
   Bell,
   LogOut,
-  BookOpen
+  BookOpen,
+  CheckCircle
 } from 'lucide-react';
 
 const navigation = [
@@ -15,6 +16,7 @@ const navigation = [
   { name: 'Student Screen Monitoring', href: '/instructor/monitoring', icon: Monitor },
   { name: 'Control Actions', href: '/instructor/controls', icon: Sliders },
   { name: 'Messaging', href: '/instructor/messaging', icon: MessageCircle },
+  { name: 'Ticket Approval', href: '/instructor/ticket-approval', icon: CheckCircle },
 ];
 
 function InstructorLayout() {

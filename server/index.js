@@ -257,12 +257,14 @@ import usersRoutes from './routes/users.js';
 import computersRoutes from './routes/computers.js';
 import dashboardRoutes from './routes/dashboard.js';
 import messagingRoutes from './routes/messaging.js';
+import ticketsRoutes from './routes/tickets.js';
 app.use('/api/auth', authRoutes);
 app.use('/api/labs', labsRoutes);
 app.use('/api/users', usersRoutes);
 app.use('/api/computers', computersRoutes);
 app.use('/api/dashboard', dashboardRoutes);
 app.use('/api/messaging', messagingRoutes);
+app.use('/api/tickets', ticketsRoutes);
 
 // Health check endpoint
 app.get('/api/health', (req, res) => {

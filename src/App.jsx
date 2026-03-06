@@ -19,6 +19,7 @@ import ClassroomDashboard from './pages/instructor/ClassroomDashboard';
 import StudentScreenMonitoring from './pages/instructor/StudentScreenMonitoring';
 import ControlActions from './pages/instructor/ControlActions';
 import Messaging from './pages/instructor/Messaging';
+import TicketApproval from './pages/instructor/TicketApproval';
 
 // Student imports
 import StudentLayout from './components/layout/StudentLayout';
@@ -69,6 +70,7 @@ function App() {
           <Route path="monitoring" element={<StudentScreenMonitoring />} />
           <Route path="controls" element={<ControlActions />} />
           <Route path="messaging" element={<Messaging />} />
+          <Route path="ticket-approval" element={<TicketApproval />} />
         </Route>
 
         {/* Student Routes */}

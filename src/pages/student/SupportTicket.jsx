@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { 
   Plus,
   Monitor,
@@ -13,42 +13,98 @@ import {
   HardDrive,
   MoreHorizontal
 } from 'lucide-react';
-import { mockStudentSession, mockStudentTickets } from '../../data/mockStudentData';
+import { mockStudentSession } from '../../data/mockStudentData';
+import ticketService from '../../services/ticketService';
 
 function SupportTicket() {
-  const [tickets, setTickets] = useState(mockStudentTickets);
+  const [tickets, setTickets] = useState([]);
+  const [stats, setStats] = useState({
+    total: 0,
+    pendingApproval: 0,
+    approved: 0,
+    rejected: 0,
+    open: 0,
+    inProgress: 0,
+    resolved: 0,
+    closed: 0
+  });
+  const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
   const [toast, setToast] = useState(null);
   const [formData, setFormData] = useState({
-    subject: '',
+    title: '',
     category: 'Hardware Issue',
-    priority: 'Medium',
+    priority: 'LOW',
     description: ''
   });
 
-  const handleSubmit = (e) => {
+  // Load tickets and stats on component mount
+  useEffect(() => {
+    loadData();
+  }, []);
+
+  const loadData = async () => {
+    try {
+      setLoading(true);
+      const [ticketsData, statsData] = await Promise.all([
+        ticketService.getMyTickets(),
+        ticketService.getMyTicketStats()
+      ]);
+      setTickets(ticketsData);
+      setStats(statsData);
+    } catch (error) {
+      console.error('Error loading data:', error);
+      setToast('Error loading tickets');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    const newTicket = {
-      id: `T-2025-${String(tickets.length + 1).padStart(3, '0')}`,
-      subject: formData.subject,
-      category: formData.category.split(' ')[0], // Get just "Hardware" from "Hardware Issue"
-      priority: formData.priority,
-      status: 'Open',
-      created: new Date().toLocaleString('en-US', { month: 'long', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' }),
-      description: formData.description
-    };
-    setTickets([newTicket, ...tickets]);
-    setFormData({ subject: '', category: 'Hardware Issue', priority: 'Medium', description: '' });
-    setShowForm(false);
-    setToast('Ticket submitted successfully!');
-    setTimeout(() => setToast(null), 3000);
+    console.log('Form submitted with data:', formData);
+    
+    try {
+      const ticketData = {
+        title: formData.title,
+        category: formData.category,
+        priority: formData.priority,
+        description: formData.description
+      };
+
+      console.log('Sending ticket data:', ticketData);
+      const newTicket = await ticketService.createTicket(ticketData);
+      console.log('Ticket created:', newTicket);
+      
+      setTickets([newTicket, ...tickets]);
+      
+      // Update stats
+      setStats(prev => ({
+        ...prev,
+        total: prev.total + 1,
+        pendingApproval: prev.pendingApproval + 1
+      }));
+
+      setFormData({ title: '', category: 'Hardware Issue', priority: 'LOW', description: '' });
+      setShowForm(false);
+      setToast('Ticket submitted successfully! It is now pending instructor approval.');
+      setTimeout(() => setToast(null), 5000);
+    } catch (error) {
+      console.error('Error submitting ticket:', error);
+      setToast('Error submitting ticket. Please try again.');
+      setTimeout(() => setToast(null), 3000);
+    }
   };
 
   const getStatusBadgeColor = (status) => {
     switch (status) {
-      case 'Open': return 'bg-blue-100 text-blue-700 border-blue-300';
-      case 'In Progress': return 'bg-yellow-100 text-yellow-700 border-yellow-300';
-      case 'Resolved': return 'bg-green-100 text-green-700 border-green-300';
+      case 'PENDING_APPROVAL': return 'bg-orange-100 text-orange-700 border-orange-300';
+      case 'APPROVED': return 'bg-green-100 text-green-700 border-green-300';
+      case 'REJECTED': return 'bg-red-100 text-red-700 border-red-300';
+      case 'OPEN': return 'bg-blue-100 text-blue-700 border-blue-300';
+      case 'IN_PROGRESS': return 'bg-yellow-100 text-yellow-700 border-yellow-300';
+      case 'RESOLVED': return 'bg-green-100 text-green-700 border-green-300';
+      case 'CLOSED': return 'bg-gray-100 text-gray-700 border-gray-300';
       default: return 'bg-gray-100 text-gray-700';
     }
   };
@@ -63,18 +119,18 @@ function SupportTicket() {
 
   const getPriorityColor = (priority) => {
     switch (priority) {
-      case 'High': return 'text-red-600 bg-red-50 px-2 py-0.5 rounded';
-      case 'Medium': return 'text-orange-600 bg-orange-50 px-2 py-0.5 rounded';
-      case 'Low': return 'text-gray-600 bg-gray-100 px-2 py-0.5 rounded';
+      case 'HIGH': return 'text-red-600 bg-red-50 px-2 py-0.5 rounded';
+      case 'MEDIUM': return 'text-orange-600 bg-orange-50 px-2 py-0.5 rounded';
+      case 'LOW': return 'text-gray-600 bg-gray-100 px-2 py-0.5 rounded';
       default: return 'text-gray-600';
     }
   };
 
-  const stats = {
-    total: tickets.length,
-    open: tickets.filter(t => t.status === 'Open').length,
-    inProgress: tickets.filter(t => t.status === 'In Progress').length,
-    resolved: tickets.filter(t => t.status === 'Resolved').length
+  const ticketStats = {
+    total: stats.total,
+    open: stats.open,
+    inProgress: stats.inProgress,
+    resolved: stats.resolved
   };
 
   return (
@@ -92,17 +148,17 @@ function SupportTicket() {
             <span className="text-sm font-medium text-gray-500">Total Tickets</span>
             <Monitor className="w-5 h-5 text-blue-500" />
           </div>
-          <div className="text-3xl font-bold text-gray-900">{stats.total}</div>
+          <div className="text-3xl font-bold text-gray-900">{ticketStats.total}</div>
           <div className="text-xs text-gray-400 mt-1">All time</div>
         </div>
 
         <div className="bg-white rounded-xl border border-gray-200 p-5 shadow-sm">
           <div className="flex items-center justify-between mb-2">
-            <span className="text-sm font-medium text-gray-500">Open</span>
-            <AlertCircle className="w-5 h-5 text-blue-500" />
+            <span className="text-sm font-medium text-gray-500">Pending Approval</span>
+            <AlertCircle className="w-5 h-5 text-orange-500" />
           </div>
-          <div className="text-3xl font-bold text-gray-900">{stats.open}</div>
-          <div className="text-xs text-gray-400 mt-1">Awaiting response</div>
+          <div className="text-3xl font-bold text-gray-900">{stats.pendingApproval}</div>
+          <div className="text-xs text-gray-400 mt-1">Awaiting instructor review</div>
         </div>
 
         <div className="bg-white rounded-xl border border-gray-200 p-5 shadow-sm">
@@ -110,7 +166,7 @@ function SupportTicket() {
             <span className="text-sm font-medium text-gray-500">In Progress</span>
             <Clock className="w-5 h-5 text-yellow-500" />
           </div>
-          <div className="text-3xl font-bold text-gray-900">{stats.inProgress}</div>
+          <div className="text-3xl font-bold text-gray-900">{ticketStats.inProgress}</div>
           <div className="text-xs text-gray-400 mt-1">Being addressed</div>
         </div>
 
@@ -119,7 +175,7 @@ function SupportTicket() {
             <span className="text-sm font-medium text-gray-500">Resolved</span>
             <CheckCircle className="w-5 h-5 text-green-500" />
           </div>
-          <div className="text-3xl font-bold text-gray-900">{stats.resolved}</div>
+          <div className="text-3xl font-bold text-gray-900">{ticketStats.resolved}</div>
           <div className="text-xs text-gray-400 mt-1">Completed</div>
         </div>
       </div>
@@ -181,11 +237,11 @@ function SupportTicket() {
             <form onSubmit={handleSubmit} className="p-4">
               <div className="space-y-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Subject</label>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Title</label>
                   <input
                     type="text"
-                    value={formData.subject}
-                    onChange={(e) => setFormData({...formData, subject: e.target.value})}
+                    value={formData.title}
+                    onChange={(e) => setFormData({...formData, title: e.target.value})}
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500"
                     placeholder="Brief description of the issue"
                     required
@@ -212,9 +268,9 @@ function SupportTicket() {
                       onChange={(e) => setFormData({...formData, priority: e.target.value})}
                       className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500"
                     >
-                      <option>Low</option>
-                      <option>Medium</option>
-                      <option>High</option>
+                      <option value="LOW">Low</option>
+                      <option value="MEDIUM">Medium</option>
+                      <option value="HIGH">High</option>
                     </select>
                   </div>
                 </div>
@@ -255,53 +311,63 @@ function SupportTicket() {
           <h2 className="text-lg font-semibold text-gray-900">My Tickets</h2>
         </div>
         <div className="overflow-x-auto">
-          <table className="w-full">
-            <thead className="bg-gray-50">
-              <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Ticket ID</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Issue</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Category</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Priority</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Created</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-200">
-              {tickets.map((ticket) => (
-                <tr key={ticket.id} className="hover:bg-gray-50">
-                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-blue-600">
-                    {ticket.id}
-                  </td>
-                  <td className="px-6 py-4 text-sm text-gray-900">
-                    {ticket.subject}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
-                    <span className="flex items-center">
-                      {getCategoryIcon(ticket.category)}
-                      {ticket.category}
-                    </span>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm">
-                    <span className={getPriorityColor(ticket.priority)}>{ticket.priority}</span>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <span className={`px-2 py-1 text-xs font-medium rounded-full border ${getStatusBadgeColor(ticket.status)}`}>
-                      {ticket.status}
-                    </span>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                    {ticket.created}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                    <button className="p-1 hover:bg-gray-100 rounded">
-                      <Eye className="w-4 h-4" />
-                    </button>
-                  </td>
+          {loading ? (
+            <div className="flex justify-center py-8">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-orange-500"></div>
+            </div>
+          ) : tickets.length === 0 ? (
+            <div className="text-center py-8 text-gray-500">
+              No tickets found. Submit your first ticket to get started.
+            </div>
+          ) : (
+            <table className="w-full">
+              <thead className="bg-gray-50">
+                <tr>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Ticket ID</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Issue</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Category</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Priority</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Created</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody className="divide-y divide-gray-200">
+                {tickets.map((ticket) => (
+                  <tr key={ticket.id} className="hover:bg-gray-50">
+                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-blue-600">
+                      {ticket.ticketId}
+                    </td>
+                    <td className="px-6 py-4 text-sm text-gray-900">
+                      {ticket.title}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
+                      <span className="flex items-center">
+                        {getCategoryIcon(ticket.category)}
+                        {ticket.category}
+                      </span>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm">
+                      <span className={getPriorityColor(ticket.priority)}>{ticket.priority}</span>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <span className={`px-2 py-1 text-xs font-medium rounded-full border ${getStatusBadgeColor(ticket.status)}`}>
+                        {ticket.status.replace('_', ' ')}
+                      </span>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                      {new Date(ticket.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                      <button className="p-1 hover:bg-gray-100 rounded">
+                        <Eye className="w-4 h-4" />
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
         </div>
       </div>
 
