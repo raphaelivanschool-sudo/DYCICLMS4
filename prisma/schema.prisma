@@ -50,6 +50,7 @@ model Laboratory {
 
   // Relations
   computers  Computer[]
+  hardwareInventoryItems HardwareInventory[]
   sessions   Session[]
   assignedInstructor User? @relation(fields: [assignedInstructorId], references: [id])
   schedules  LabSchedule[]
@@ -79,6 +80,7 @@ model Computer {
   laboratory Laboratory @relation(fields: [laboratoryId], references: [id], onDelete: Cascade)
   sessionStudents SessionStudent[]
   software  ComputerSoftware[]
+  hardwareInventoryItems HardwareInventory[]
 }
 
 model Session {
@@ -203,6 +205,25 @@ enum GroupRole {
   MEMBER
 }
 
+model HardwareInventory {
+  id              Int      @id @default(autoincrement())
+  name            String
+  deviceType      DeviceType
+  model           String?
+  serialNumber    String   @unique
+  condition       Condition @default(GOOD)
+  status          HardwareStatus @default(ACTIVE)
+  notes           String?  @db.Text
+  laboratoryId    Int
+  assignedComputerId Int?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  // Relations
+  laboratory      Laboratory @relation(fields: [laboratoryId], references: [id], onDelete: Cascade)
+  assignedComputer Computer? @relation(fields: [assignedComputerId], references: [id])
+}
+
 model Inventory {
   id          Int      @id @default(autoincrement())
   name        String
@@ -268,6 +289,32 @@ enum InventoryStatus {
   ACTIVE
   INACTIVE
   DEPLETED
+}
+
+enum DeviceType {
+  MONITOR
+  CPU
+  KEYBOARD
+  MOUSE
+  HEADSET
+  WEBCAM
+  UPS
+  PRINTER
+  OTHER
+}
+
+enum Condition {
+  GOOD
+  FAIR
+  POOR
+  DAMAGED
+}
+
+enum HardwareStatus {
+  ACTIVE
+  INACTIVE
+  UNDER_REPAIR
+  MISSING
 }
 
 // Lab Schedule for instructor assignments

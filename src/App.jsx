@@ -1,31 +1,36 @@
-import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
-import Login from './pages/Login';
-import ProtectedRoute from './components/ProtectedRoute';
-import AdminLayout from './components/layout/AdminLayout';
-import Dashboard from './pages/admin/Dashboard';
-import UserManagement from './pages/admin/UserManagement';
-import ScheduleManagement from './pages/admin/ScheduleManagement';
-import Laboratories from './pages/admin/Laboratories';
-import Computers from './pages/admin/Computers';
-import NetworkControl from './pages/admin/NetworkControl';
-import SecuritySettings from './pages/admin/SecuritySettings';
-import SystemLogs from './pages/admin/SystemLogs';
-import Tickets from './pages/admin/Tickets';
-import Inventory from './pages/admin/Inventory';
+import {
+  BrowserRouter as Router,
+  Routes,
+  Route,
+  Navigate,
+} from "react-router-dom";
+import Login from "./pages/Login";
+import ProtectedRoute from "./components/ProtectedRoute";
+import AdminLayout from "./components/layout/AdminLayout";
+import Dashboard from "./pages/admin/Dashboard";
+import UserManagement from "./pages/admin/UserManagement";
+import ScheduleManagement from "./pages/admin/ScheduleManagement";
+import Laboratories from "./pages/admin/Laboratories";
+import Computers from "./pages/admin/Computers";
+import NetworkControl from "./pages/admin/NetworkControl";
+import SecuritySettings from "./pages/admin/SecuritySettings";
+import SystemLogs from "./pages/admin/SystemLogs";
+import Tickets from "./pages/admin/Tickets";
+import HardwareInventory from "./pages/admin/HardwareInventory";
 
 // Instructor imports
-import InstructorLayout from './components/layout/InstructorLayout';
-import ClassroomDashboard from './pages/instructor/ClassroomDashboard';
-import StudentScreenMonitoring from './pages/instructor/StudentScreenMonitoring';
-import ControlActions from './pages/instructor/ControlActions';
-import Messaging from './pages/instructor/Messaging';
-import TicketApproval from './pages/instructor/TicketApproval';
+import InstructorLayout from "./components/layout/InstructorLayout";
+import ClassroomDashboard from "./pages/instructor/ClassroomDashboard";
+import StudentScreenMonitoring from "./pages/instructor/StudentScreenMonitoring";
+import ControlActions from "./pages/instructor/ControlActions";
+import Messaging from "./pages/instructor/Messaging";
+import TicketApproval from "./pages/instructor/TicketApproval";
 
 // Student imports
-import StudentLayout from './components/layout/StudentLayout';
-import SessionDashboard from './pages/student/SessionDashboard';
-import SupportTicket from './pages/student/SupportTicket';
-import StudentMessaging from './pages/student/Messaging';
+import StudentLayout from "./components/layout/StudentLayout";
+import SessionDashboard from "./pages/student/SessionDashboard";
+import SupportTicket from "./pages/student/SupportTicket";
+import StudentMessaging from "./pages/student/Messaging";
 
 function App() {
   return (
@@ -33,12 +38,12 @@ function App() {
       <Routes>
         {/* Login Page - Public */}
         <Route path="/" element={<Login />} />
-        
+
         {/* Admin Routes */}
-        <Route 
-          path="/admin" 
+        <Route
+          path="/admin"
           element={
-            <ProtectedRoute allowedRoles={['admin']}>
+            <ProtectedRoute allowedRoles={["admin"]}>
               <AdminLayout />
             </ProtectedRoute>
           }
@@ -53,14 +58,14 @@ function App() {
           <Route path="security" element={<SecuritySettings />} />
           <Route path="logs" element={<SystemLogs />} />
           <Route path="tickets" element={<Tickets />} />
-          <Route path="inventory" element={<Inventory />} />
+          <Route path="hardware-inventory" element={<HardwareInventory />} />
         </Route>
 
         {/* Instructor Routes */}
-        <Route 
-          path="/instructor" 
+        <Route
+          path="/instructor"
           element={
-            <ProtectedRoute allowedRoles={['instructor']}>
+            <ProtectedRoute allowedRoles={["instructor"]}>
               <InstructorLayout />
             </ProtectedRoute>
           }
@@ -74,10 +79,10 @@ function App() {
         </Route>
 
         {/* Student Routes */}
-        <Route 
-          path="/student" 
+        <Route
+          path="/student"
           element={
-            <ProtectedRoute allowedRoles={['student']}>
+            <ProtectedRoute allowedRoles={["student"]}>
               <StudentLayout />
             </ProtectedRoute>
           }
