@@ -128,17 +128,13 @@ const ScheduleManagement = () => {
       ]);
 
       if (schedulesRes.data.success) {
-        console.log('Schedules data received:', schedulesRes.data.data);
         setSchedules(schedulesRes.data.data);
         setTotalPages(schedulesRes.data.pagination.pages);
         setTotalSchedules(schedulesRes.data.pagination.total);
       }
 
       if (labsRes.data.success) {
-        console.log('Labs data received:', labsRes.data.data);
         setLaboratories(labsRes.data.data);
-      } else {
-        console.error('Labs API response:', labsRes.data);
       }
 
       if (instructorsRes.data.success) {

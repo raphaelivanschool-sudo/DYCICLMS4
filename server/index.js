@@ -274,6 +274,7 @@ import dashboardRoutes from "./routes/dashboard.js";
 import messagingRoutes from "./routes/messaging.js";
 import ticketsRoutes from "./routes/tickets.js";
 import hardwareInventoryRoutes from "./routes/hardware-inventory.js";
+import schedulesRoutes from "./routes/schedules.js";
 app.use("/api/auth", authRoutes);
 app.use("/api/labs", labsRoutes);
 app.use("/api/users", usersRoutes);
@@ -282,6 +283,7 @@ app.use("/api/dashboard", dashboardRoutes);
 app.use("/api/messaging", messagingRoutes);
 app.use("/api/tickets", ticketsRoutes);
 app.use("/api/hardware-inventory", hardwareInventoryRoutes);
+app.use("/api/schedules", schedulesRoutes);
 
 // Health check endpoint
 app.get("/api/health", (req, res) => {
