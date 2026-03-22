@@ -275,15 +275,18 @@ import messagingRoutes from "./routes/messaging.js";
 import ticketsRoutes from "./routes/tickets.js";
 import hardwareInventoryRoutes from "./routes/hardware-inventory.js";
 import schedulesRoutes from "./routes/schedules.js";
+import gradingRoutes from "./routes/grading.js";
+import { authenticateToken } from "./middleware/auth.js";
 app.use("/api/auth", authRoutes);
-app.use("/api/labs", labsRoutes);
-app.use("/api/users", usersRoutes);
-app.use("/api/computers", computersRoutes);
-app.use("/api/dashboard", dashboardRoutes);
-app.use("/api/messaging", messagingRoutes);
-app.use("/api/tickets", ticketsRoutes);
-app.use("/api/hardware-inventory", hardwareInventoryRoutes);
-app.use("/api/schedules", schedulesRoutes);
+app.use("/api/labs", authenticateToken, labsRoutes);
+app.use("/api/users", authenticateToken, usersRoutes);
+app.use("/api/computers", authenticateToken, computersRoutes);
+app.use("/api/dashboard", authenticateToken, dashboardRoutes);
+app.use("/api/messaging", authenticateToken, messagingRoutes);
+app.use("/api/tickets", authenticateToken, ticketsRoutes);
+app.use("/api/hardware-inventory", authenticateToken, hardwareInventoryRoutes);
+app.use("/api/schedules", authenticateToken, schedulesRoutes);
+app.use("/api/grading", authenticateToken, gradingRoutes);
 
 // Health check endpoint
 app.get("/api/health", (req, res) => {

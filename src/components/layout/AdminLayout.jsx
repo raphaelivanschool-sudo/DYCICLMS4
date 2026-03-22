@@ -18,6 +18,7 @@ import {
   MessageCircle,
   Users,
   Calendar,
+  GraduationCap,
 } from "lucide-react";
 
 const navigation = [
@@ -40,6 +41,7 @@ const navigation = [
   { name: "Tickets / Support", href: "/admin/tickets", icon: Ticket },
   { name: "Inventory", href: "/admin/hardware-inventory", icon: Package },
   { name: "Messaging", href: "/admin/chats", icon: MessageCircle },
+  { name: "Grading", href: "/admin/grading", icon: GraduationCap },
 ];
 
 function AdminLayout() {
