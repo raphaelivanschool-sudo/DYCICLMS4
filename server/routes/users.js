@@ -12,6 +12,7 @@ router.use(authenticateToken);
 // Middleware to check if user is admin
 const requireAdmin = (req, res, next) => {
   if (req.user.role !== 'ADMIN') {
+    console.log('Access denied. User role:', req.user.role, 'Expected: ADMIN');
     return res.status(403).json({ message: 'Admin access required' });
   }
   next();
@@ -26,7 +27,9 @@ router.use((req, res, next) => {
     method: req.method,
     path: req.path,
     user: req.user,
-    headers: req.headers
+    query: req.query,
+    headers: req.headers,
+    timestamp: new Date().toISOString()
   });
   next();
 });
@@ -34,11 +37,11 @@ router.use((req, res, next) => {
 // GET /api/users - Get users with optional role filter
 router.get('/', async (req, res) => {
   try {
-    const { role, search, page = 1, limit = 10 } = req.query;
+    const { role, search, page = 1, limit = 50 } = req.query; // Increased limit for student dropdown
     
     const whereClause = {};
     if (role) {
-      whereClause.role = role;
+      whereClause.role = role.toUpperCase(); // Convert to uppercase for comparison
     }
     if (search) {
       whereClause.OR = [
@@ -59,6 +62,7 @@ router.get('/', async (req, res) => {
           fullName: true,
           email: true,
           role: true,
+          yearSection: true,
           createdAt: true,
           updatedAt: true
         },
@@ -71,16 +75,13 @@ router.get('/', async (req, res) => {
       prisma.user.count({ where: whereClause })
     ]);
 
-    res.json({
-      success: true,
-      data: users,
-      pagination: {
-        page: parseInt(page),
-        limit: parseInt(limit),
-        total: totalCount,
-        pages: Math.ceil(totalCount / parseInt(limit))
-      }
-    });
+    // Add yearSection for students (get from database directly)
+    const usersWithYearSection = users.map(user => ({
+      ...user,
+      yearSection: user.yearSection || null
+    }));
+
+    res.json(usersWithYearSection); // Return array directly, not wrapped in object
   } catch (error) {
     console.error('Error fetching users:', error);
     res.status(500).json({ success: false, message: 'Failed to fetch users' });
