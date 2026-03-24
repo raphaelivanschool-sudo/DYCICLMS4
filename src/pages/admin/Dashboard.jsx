@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { dashboardApi } from '../../services/api.js';
+import DeveloperMode from '../../components/DeveloperMode.jsx';
 import {
   Building2,
   Monitor,
@@ -17,7 +18,8 @@ import {
   Zap,
   UserCog,
   GraduationCap,
-  Shield
+  Shield,
+  Code
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
@@ -81,6 +83,7 @@ function Dashboard() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [lastUpdated, setLastUpdated] = useState(null);
+  const [showDeveloperMode, setShowDeveloperMode] = useState(false);
 
   // Fetch dashboard data
   const fetchDashboardData = async () => {
@@ -570,6 +573,22 @@ function Dashboard() {
           {renderQuickStats()}
         </div>
       </div>
+
+      {/* Developer Mode Button */}
+      <div className="flex justify-center pt-8 border-t border-gray-200">
+        <button 
+          onClick={() => setShowDeveloperMode(true)}
+          className="flex items-center gap-2 px-6 py-3 bg-gray-900 text-white rounded-lg hover:bg-gray-800 transition-colors font-medium"
+        >
+          <Code className="w-5 h-5" />
+          Developer Mode
+        </button>
+      </div>
+
+      {/* Developer Mode Modal */}
+      {showDeveloperMode && (
+        <DeveloperMode onClose={() => setShowDeveloperMode(false)} />
+      )}
     </div>
   );
 }

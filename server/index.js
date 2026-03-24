@@ -276,6 +276,7 @@ import ticketsRoutes from "./routes/tickets.js";
 import hardwareInventoryRoutes from "./routes/hardware-inventory.js";
 import schedulesRoutes from "./routes/schedules.js";
 import gradingRoutes from "./routes/grading.js";
+import networkRoutes from "./routes/network.js";
 import { authenticateToken } from "./middleware/auth.js";
 app.use("/api/auth", authRoutes);
 app.use("/api/labs", authenticateToken, labsRoutes);
@@ -287,6 +288,7 @@ app.use("/api/tickets", authenticateToken, ticketsRoutes);
 app.use("/api/hardware-inventory", authenticateToken, hardwareInventoryRoutes);
 app.use("/api/schedules", authenticateToken, schedulesRoutes);
 app.use("/api/grading", authenticateToken, gradingRoutes);
+app.use("/api/network", authenticateToken, networkRoutes);
 
 // Health check endpoint
 app.get("/api/health", (req, res) => {
