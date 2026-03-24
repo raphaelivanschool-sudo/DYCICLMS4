@@ -29,6 +29,8 @@ model User {
   labSchedules   LabSchedule[]
   createdGroups  Group[]
   groupMemberships GroupMember[]
+  subjectsHandled Subject[] @relation("InstructorSubjects")
+  grades          Grade[]   @relation("StudentGrades")
 }
 
 model Laboratory {
@@ -348,4 +350,49 @@ model ComputerSoftware {
   computer        Computer   @relation(fields: [computerId], references: [id], onDelete: Cascade)
 
   @@unique([computerId, softwareName])
+}
+
+// ClassGroup model removed - subjects use yearSection only
+
+
+model Subject {
+  id           Int         @id @default(autoincrement())
+  name         String
+  code         String
+  yearSection  String
+  status       String      @default("ACTIVE")
+  instructor   User        @relation("InstructorSubjects", fields: [instructorId], references: [id])
+  instructorId Int
+  grades       Grade[]
+  createdAt    DateTime    @default(now())
+  updatedAt    DateTime    @updatedAt
+}
+
+model Grade {
+  id              Int              @id @default(autoincrement())
+  subject         Subject          @relation(fields: [subjectId], references: [id])
+  subjectId       Int
+  student         User             @relation("StudentGrades", fields: [studentId], references: [id])
+  studentId       Int
+  prelim          Float?
+  midterm         Float?
+  semiFinals      Float?
+  finals          Float?
+  transmutedGrade Float?
+  remarks         String?
+  components      GradeComponent[]
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+
+  @@unique([subjectId, studentId])
+}
+
+model GradeComponent {
+  id       Int    @id @default(autoincrement())
+  grade    Grade  @relation(fields: [gradeId], references: [id], onDelete: Cascade)
+  gradeId  Int
+  label    String
+  type     String
+  score    Float
+  maxScore Float
 }

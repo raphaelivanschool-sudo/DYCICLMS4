@@ -8,7 +8,8 @@ import {
   Bell,
   LogOut,
   BookOpen,
-  CheckCircle
+  CheckCircle,
+  GraduationCap
 } from 'lucide-react';
 
 const navigation = [
@@ -17,6 +18,7 @@ const navigation = [
   { name: 'Control Actions', href: '/instructor/controls', icon: Sliders },
   { name: 'Messaging', href: '/instructor/messaging', icon: MessageCircle },
   { name: 'Ticket Approval', href: '/instructor/ticket-approval', icon: CheckCircle },
+  { name: 'Grading', href: '/instructor/grading', icon: GraduationCap },
 ];
 
 function InstructorLayout() {

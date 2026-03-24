@@ -7,6 +7,7 @@ import {
   LogOut,
   GraduationCap,
   MessageCircle,
+  ClipboardList,
 } from 'lucide-react';
 import { mockStudentSession } from '../../data/mockStudentData';
 
@@ -14,6 +15,7 @@ const navigation = [
   { name: 'Session Dashboard', href: '/student/dashboard', icon: LayoutDashboard },
   { name: 'Support Ticket', href: '/student/tickets', icon: Ticket },
   { name: 'Messaging', href: '/student/messaging', icon: MessageCircle },
+  { name: 'My Grades', href: '/student/my-grades', icon: ClipboardList },
 ];
 
 function StudentLayout() {
