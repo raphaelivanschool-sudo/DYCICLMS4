@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import {
   FileText,
   Download,
@@ -14,28 +14,7 @@ import {
   RotateCcw
 } from 'lucide-react';
 
-// Mock data
-const logs = [
-  { id: 1, timestamp: '2025-02-22 14:32:15', user: 'Student 01', action: 'User Login', computer: 'EDT-PC01', lab: 'EdTech Laboratory', status: 'success', details: 'Successful login from student workstation' },
-  { id: 2, timestamp: '2025-02-22 14:30:42', user: 'Student 03', action: 'App Blocked', computer: 'EDT-PC03', lab: 'EdTech Laboratory', status: 'warning', details: 'Attempted to run unauthorized game application' },
-  { id: 3, timestamp: '2025-02-22 14:28:09', user: 'Student 09', action: 'Internet Disabled', computer: 'SND-PC02', lab: 'Sandbox', status: 'success', details: 'Internet access disabled by administrator' },
-  { id: 4, timestamp: '2025-02-22 14:25:33', user: 'Admin', action: 'Screen Locked', computer: 'NXS-PC01', lab: 'Nexus', status: 'success', details: 'Remote screen lock executed successfully' },
-  { id: 5, timestamp: '2025-02-22 14:22:18', user: 'Student 05', action: 'System Command', computer: 'EDT-PC05', lab: 'EdTech Laboratory', status: 'error', details: 'Failed to execute system command - insufficient permissions' },
-  { id: 6, timestamp: '2025-02-22 14:20:55', user: 'Student 08', action: 'User Logout', computer: 'SND-PC01', lab: 'Sandbox', status: 'success', details: 'User session terminated normally' },
-  { id: 7, timestamp: '2025-02-22 14:19:27', user: 'Student 15', action: 'Website Blocked', computer: 'NXS-PC03', lab: 'Nexus', status: 'warning', details: 'Access to blocked website attempted: facebook.com' },
-  { id: 8, timestamp: '2025-02-22 14:18:41', user: 'Mr. Cruz', action: 'Instructor Login', computer: 'EDT-PC02', lab: 'EdTech Laboratory', status: 'success', details: 'Instructor login from lab workstation' },
-  { id: 9, timestamp: '2025-02-22 14:15:12', user: 'System', action: 'Backup Complete', computer: 'Server', lab: 'All Labs', status: 'success', details: 'Daily backup completed successfully' },
-  { id: 10, timestamp: '2025-02-22 14:12:38', user: 'Student 12', action: 'File Transfer', computer: 'SND-PC04', lab: 'Sandbox', status: 'warning', details: 'Large file transfer detected - flagged for review' },
-  { id: 11, timestamp: '2025-02-22 14:10:05', user: 'Admin', action: 'Lab Shutdown', computer: 'All', lab: 'Innovation Hub', status: 'success', details: 'Scheduled maintenance shutdown initiated' },
-  { id: 12, timestamp: '2025-02-22 14:08:52', user: 'Student 22', action: 'USB Detected', computer: 'EDT-PC04', lab: 'EdTech Laboratory', status: 'error', details: 'USB storage device blocked by security policy' },
-];
-
-const stats = {
-  totalActions: 156,
-  activeUsers: 24,
-  criticalCommands: 8,
-  errors: 3
-};
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
 
 // Helper component for badges
 const Badge = ({ variant, children }) => {
@@ -52,45 +31,101 @@ const Badge = ({ variant, children }) => {
   );
 };
 
+// Helper function to get auth token
+const getAuthToken = () => {
+  const token = localStorage.getItem('token');
+  return token ? `Bearer ${token}` : null;
+};
+
 function SystemLogs() {
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [actionFilter, setActionFilter] = useState('all');
-  const [dateRange, setDateRange] = useState('today');
+  const [dateRange, setDateRange] = useState('week');
+  const [logs, setLogs] = useState([]);
+  const [stats, setStats] = useState({ totalActions: 0, activeUsers: 0, criticalCommands: 0, errors: 0 });
+  const [uniqueActions, setUniqueActions] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [refreshKey, setRefreshKey] = useState(0);
 
-  const filteredLogs = logs.filter(log => {
-    const matchesSearch = log.user.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         log.action.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         log.computer.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         log.lab.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesStatus = statusFilter === 'all' || log.status === statusFilter;
-    const matchesAction = actionFilter === 'all' || log.action === actionFilter;
-    return matchesSearch && matchesStatus && matchesAction;
-  });
+  // Fetch logs from API
+  const fetchLogs = async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      
+      const params = new URLSearchParams({
+        page: 1,
+        limit: 100,
+        dateRange,
+        actionFilter: actionFilter === 'all' ? '' : actionFilter,
+        searchTerm
+      });
 
-  const getStatusBadge = (status) => {
-    const variants = {
-      success: 'success',
-      warning: 'warning',
-      error: 'destructive',
-    };
-    return <Badge variant={variants[status]}>{status}</Badge>;
-  };
+      const response = await fetch(`${API_URL}/api/logs?${params}`, {
+        headers: {
+          'Authorization': getAuthToken()
+        }
+      });
 
-  const getStatusIcon = (status) => {
-    switch (status) {
-      case 'success':
-        return <CheckCircle className="w-4 h-4 text-green-500" />;
-      case 'warning':
-        return <AlertTriangle className="w-4 h-4 text-yellow-500" />;
-      case 'error':
-        return <XCircle className="w-4 h-4 text-red-500" />;
-      default:
-        return <Activity className="w-4 h-4 text-gray-500" />;
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      const data = await response.json();
+      setLogs(data.logs || []);
+      setStats(data.stats || { totalActions: 0, activeUsers: 0, criticalCommands: 0, errors: 0 });
+      setUniqueActions(data.uniqueActions || []);
+    } catch (error) {
+      console.error('Error fetching logs:', error);
+      setError('Failed to fetch logs. Please try again.');
+      setLogs([]);
+      setStats({ totalActions: 0, activeUsers: 0, criticalCommands: 0, errors: 0 });
+      setUniqueActions([]);
+    } finally {
+      setLoading(false);
     }
   };
 
-  const uniqueActions = [...new Set(logs.map(log => log.action))];
+  // Fetch logs on component mount and when dependencies change
+  useEffect(() => {
+    fetchLogs();
+  }, [dateRange, actionFilter, refreshKey]);
+
+  // Debounced search effect
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      if (searchTerm !== undefined) {
+        fetchLogs();
+      }
+    }, 500);
+
+    return () => clearTimeout(timer);
+  }, [searchTerm]);
+
+  const filteredLogs = logs.filter(log => {
+    // Client-side filtering for status (since backend doesn't have status field)
+    const matchesStatus = statusFilter === 'all' || 
+      (statusFilter === 'success' && !log.action.includes('ERROR')) ||
+      (statusFilter === 'error' && log.action.includes('ERROR')) ||
+      (statusFilter === 'warning' && log.action.includes('WARNING'));
+    
+    return matchesStatus;
+  });
+
+  const getStatusBadge = (action) => {
+    if (action.includes('ERROR')) return <Badge variant="destructive">Error</Badge>;
+    if (action.includes('WARNING')) return <Badge variant="warning">Warning</Badge>;
+    return <Badge variant="success">Success</Badge>;
+  };
+
+  const getStatusIcon = (action) => {
+    if (action.includes('ERROR')) return <XCircle className="w-4 h-4 text-red-500" />;
+    if (action.includes('WARNING')) return <AlertTriangle className="w-4 h-4 text-yellow-500" />;
+    return <CheckCircle className="w-4 h-4 text-green-500" />;
+  };
+
 
   return (
     <div className="space-y-6">
@@ -205,7 +240,10 @@ function SystemLogs() {
                 <option key={action} value={action}>{action}</option>
               ))}
             </select>
-            <button className="flex items-center h-9 px-3 py-2 bg-white border border-gray-300 text-gray-700 rounded-md text-sm font-medium hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors">
+            <button 
+              onClick={() => setRefreshKey(prev => prev + 1)}
+              className="flex items-center h-9 px-3 py-2 bg-white border border-gray-300 text-gray-700 rounded-md text-sm font-medium hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors"
+            >
               <RotateCcw className="w-4 h-4 mr-2" />
               Refresh
             </button>
@@ -219,59 +257,77 @@ function SystemLogs() {
           <h3 className="text-lg font-semibold text-gray-900">Activity Logs</h3>
         </div>
         <div className="p-0">
-          <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead className="bg-gray-50 border-b border-gray-200">
-                <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Timestamp</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Lab</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Computer</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">User</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Action / Event</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Details</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-200">
-                {filteredLogs.map((log) => (
-                  <tr key={log.id} className="hover:bg-gray-50 transition-colors">
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                      {log.timestamp}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                      {log.lab}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm font-mono text-gray-600">
-                      {log.computer}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                      {log.user}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="flex items-center">
-                        {getStatusIcon(log.status)}
-                        <span className="ml-2 text-sm text-gray-900">{log.action}</span>
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      {getStatusBadge(log.status)}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                      <button className="flex items-center text-blue-600 hover:text-blue-800">
-                        <Eye className="w-4 h-4 mr-1" />
-                        View
-                      </button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-          {filteredLogs.length === 0 && (
-            <div className="text-center py-12">
-              <FileText className="w-12 h-12 text-gray-300 mx-auto mb-4" />
-              <p className="text-gray-500">No logs found matching your filters.</p>
+          {loading ? (
+            <div className="flex items-center justify-center py-12">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500"></div>
+              <span className="ml-2 text-gray-500">Loading logs...</span>
             </div>
+          ) : error ? (
+            <div className="text-center py-12">
+              <XCircle className="w-12 h-12 text-red-300 mx-auto mb-4" />
+              <p className="text-red-500 mb-2">{error}</p>
+              <button 
+                onClick={() => setRefreshKey(prev => prev + 1)}
+                className="text-blue-600 hover:text-blue-800 text-sm"
+              >
+                Try again
+              </button>
+            </div>
+          ) : (
+            <>
+              <div className="overflow-x-auto">
+                <table className="w-full">
+                  <thead className="bg-gray-50 border-b border-gray-200">
+                    <tr>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Timestamp</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">User</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Action</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Description</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">IP Address</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-200">
+                    {filteredLogs.map((log) => (
+                      <tr key={log.id} className="hover:bg-gray-50 transition-colors">
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                          {new Date(log.createdAt).toLocaleString()}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                          <div>
+                            <div className="font-medium">{log.user?.fullName || 'System'}</div>
+                            <div className="text-xs text-gray-500">
+                              @{log.user?.username || 'system'} • {log.user?.role || 'SYSTEM'}
+                            </div>
+                          </div>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <div className="flex items-center">
+                            {getStatusIcon(log.action)}
+                            <span className="ml-2 text-sm text-gray-900">{log.action}</span>
+                          </div>
+                        </td>
+                        <td className="px-6 py-4 text-sm text-gray-500 max-w-xs truncate">
+                          {log.description || '-'}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm font-mono text-gray-600">
+                          {log.ipAddress || '-'}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          {getStatusBadge(log.action)}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              {filteredLogs.length === 0 && (
+                <div className="text-center py-12">
+                  <FileText className="w-12 h-12 text-gray-300 mx-auto mb-4" />
+                  <p className="text-gray-500">No logs found matching your filters.</p>
+                </div>
+              )}
+            </>
           )}
         </div>
       </div>

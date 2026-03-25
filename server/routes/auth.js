@@ -9,6 +9,9 @@ const router = express.Router();
 
 // POST /api/auth/login - Login user
 router.post('/login', async (req, res) => {
+  console.log('=== LOGIN ATTEMPT ===');
+  console.log('Request body:', req.body);
+  console.log('Request headers:', req.headers);
   try {
     const { username, password } = req.body;
 
@@ -45,14 +48,20 @@ router.post('/login', async (req, res) => {
     );
 
     // Log the login to SystemLog
-    await prisma.systemLog.create({
-      data: {
-        action: 'LOGIN',
-        description: `User ${user.username} logged in`,
-        userId: user.id,
-        ipAddress: req.ip || req.connection.remoteAddress
-      }
-    });
+    console.log('Attempting to log login for user:', user.username, 'ID:', user.id);
+    try {
+      await prisma.systemLog.create({
+        data: {
+          action: 'LOGIN',
+          description: `User ${user.username} logged in`,
+          userId: user.id,
+          ipAddress: req.ip || req.connection.remoteAddress
+        }
+      });
+      console.log('Successfully logged login to SystemLog');
+    } catch (logError) {
+      console.error('Error logging to SystemLog:', logError);
+    }
 
     // Return success response
     res.json({
