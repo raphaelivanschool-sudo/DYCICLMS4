@@ -1,4 +1,5 @@
 import axios from 'axios';
+import { usersApi } from './api';
 
 const API = import.meta.env.VITE_API_URL || 'http://localhost:3001';
 
@@ -27,6 +28,9 @@ export const gradingService = {
   updateGrade:         (gradeId, data) => gradingApi.put(`/grades/${gradeId}`, data),
   getMyGrades:         ()              => gradingApi.get('/my-grades'),
   // Admin enrollment methods
+  getAllStudents:      ()              => usersApi.getAll('student').then(response => response.data),
   searchStudents:      (search, yearSection) => gradingApi.get('/students', { params: { search, yearSection } }),
   enrollStudent:       (subjectId, studentId) => gradingApi.post(`/subjects/${subjectId}/enroll`, { studentId }),
+  getEnrolledStudents: (subjectId)     => gradingApi.get(`/subjects/${subjectId}/students`),
+  bulkEnrollStudents:  (subjectId, studentIds) => gradingApi.post(`/subjects/${subjectId}/bulk-enroll`, { studentIds }),
 };

@@ -308,4 +308,101 @@ router.get('/students', async (req, res) => {
   }
 });
 
+// GET /api/grading/subjects/:subjectId/students
+// Get all students enrolled in a subject (admin only)
+router.get('/subjects/:subjectId/students', async (req, res) => {
+  if (req.user.role?.toLowerCase() !== 'admin') {
+    return res.status(403).json({ error: 'Admin access required' });
+  }
+
+  const subjectId = parseInt(req.params.subjectId);
+
+  try {
+    // Verify subject exists
+    const subject = await prisma.subject.findUnique({
+      where: { id: subjectId },
+    });
+    if (!subject) {
+      return res.status(404).json({ error: 'Subject not found' });
+    }
+
+    // Get enrolled students through grade records
+    const enrolledStudents = await prisma.grade.findMany({
+      where: { subjectId },
+      include: {
+        student: {
+          select: { id: true, fullName: true, email: true, yearSection: true },
+        },
+      },
+      orderBy: { student: { fullName: 'asc' } },
+    });
+
+    // Extract student data
+    const students = enrolledStudents.map(grade => grade.student);
+
+    res.json(students);
+  } catch (err) {
+    console.error('Error fetching enrolled students:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// POST /api/grading/subjects/:subjectId/bulk-enroll
+// Bulk enroll multiple students in a subject (admin only)
+router.post('/subjects/:subjectId/bulk-enroll', async (req, res) => {
+  if (req.user.role?.toLowerCase() !== 'admin') {
+    return res.status(403).json({ error: 'Admin access required' });
+  }
+
+  const subjectId = parseInt(req.params.subjectId);
+  const { studentIds } = req.body;
+
+  if (!studentIds || !Array.isArray(studentIds) || studentIds.length === 0) {
+    return res.status(400).json({ error: 'studentIds array is required' });
+  }
+
+  try {
+    // Verify subject exists
+    const subject = await prisma.subject.findUnique({
+      where: { id: subjectId },
+    });
+    if (!subject) {
+      return res.status(404).json({ error: 'Subject not found' });
+    }
+
+    // Verify all students exist and are students
+    const students = await prisma.user.findMany({
+      where: {
+        id: { in: studentIds },
+        role: 'STUDENT',
+      },
+      select: { id: true, fullName: true, yearSection: true },
+    });
+
+    if (students.length !== studentIds.length) {
+      return res.status(400).json({ error: 'Some students not found or not student role' });
+    }
+
+    // Bulk create grade records (enrollments)
+    const enrollments = await Promise.all(
+      students.map(async (student) => {
+        return await prisma.grade.upsert({
+          where: { subjectId_studentId: { subjectId, studentId: student.id } },
+          create: { subjectId, studentId: student.id },
+          update: {},
+          include: { student: { select: { id: true, fullName: true, email: true } } },
+        });
+      })
+    );
+
+    res.status(201).json({ 
+      message: `${enrollments.length} students enrolled successfully`, 
+      enrollments 
+    });
+  } catch (err) {
+    console.error('Bulk enrollment error:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 export default router;
