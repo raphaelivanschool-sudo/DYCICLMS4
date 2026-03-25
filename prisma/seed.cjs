@@ -55,28 +55,26 @@ async function main() {
   // Create student users
   const student1 = await prisma.user.upsert({
     where: { username: 'student1' },
-    update: { yearSection: '3A' },
+    update: {},
     create: {
       username: 'student1',
       password: studentPassword,
       role: 'STUDENT',
       fullName: 'Juan Dela Cruz',
-      email: 'student1@dyci.edu',
-      yearSection: '3A'
+      email: 'student1@dyci.edu'
     }
   });
   console.log('Created student user:', student1.username);
 
   const student2 = await prisma.user.upsert({
     where: { username: 'student' },
-    update: { yearSection: '3A' },
+    update: {},
     create: {
       username: 'student',
       password: studentPassword,
       role: 'STUDENT',
       fullName: 'Maria Santos',
-      email: 'student@dyci.edu',
-      yearSection: '3A'
+      email: 'student@dyci.edu'
     }
   });
   console.log('Created student user:', student2.username);

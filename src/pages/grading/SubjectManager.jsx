@@ -1,16 +1,8 @@
 import { useState, useEffect } from 'react';
 import { gradingService } from '../../services/gradingService';
 import {
-  BookOpen, BookPlus, Plus, Trash2, CalendarDays, Users, X, Loader2, AlertCircle, Eye, UserCheck
+  BookOpen, BookPlus, Plus, Trash2, CalendarDays, Users, X, Loader2, AlertCircle
 } from 'lucide-react';
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from '../../components/ui/dialog';
-import { Button } from '../../components/ui/button';
 
 export default function SubjectManager() {
   const [subjects,    setSubjects]    = useState([]);
@@ -20,42 +12,10 @@ export default function SubjectManager() {
   const [error,       setError]       = useState(null);
   const [deleteTarget,setDeleteTarget]= useState(null);
   const [form, setForm] = useState({ name: '', code: '', yearSection: '' });
-  const [selectedSubject, setSelectedSubject] = useState(null);
-  const [enrolledStudents, setEnrolledStudents] = useState([]);
-  const [fetchingStudents, setFetchingStudents] = useState(false);
-  const [showStudentsDialog, setShowStudentsDialog] = useState(false);
 
   useEffect(() => {
     loadSubjects();
-    
-    // Set up an interval to refresh subjects periodically for real-time updates
-    const interval = setInterval(() => {
-      loadSubjects();
-    }, 10000); // Refresh every 10 seconds
-    
-    return () => clearInterval(interval);
   }, []);
-
-  async function loadEnrolledStudents(subject) {
-    if (!subject) return;
-    
-    setFetchingStudents(true);
-    try {
-      const { data } = await gradingService.getEnrolledStudents(subject.id);
-      setEnrolledStudents(data);
-    } catch (err) {
-      console.error('Failed to load enrolled students:', err);
-      setEnrolledStudents([]);
-    } finally {
-      setFetchingStudents(false);
-    }
-  }
-
-  function handleViewStudents(subject) {
-    setSelectedSubject(subject);
-    setShowStudentsDialog(true);
-    loadEnrolledStudents(subject);
-  }
 
   async function loadSubjects() {
     setFetching(true);
@@ -235,23 +195,13 @@ export default function SubjectManager() {
                     {s.code}
                   </span>
                 </div>
-              <div className="flex items-center gap-2 mt-1.5 text-xs text-zinc-500">
-                <CalendarDays size={13} />
-                <span>{s.yearSection}</span>
-                <span>·</span>
-                <Users size={13} />
-                <span>{s._count?.grades || 0} student{(s._count?.grades || 0) !== 1 ? 's' : ''}</span>
-                <span>·</span>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => handleViewStudents(s)}
-                  className="text-xs text-blue-600 hover:text-blue-700 hover:bg-blue-50 p-1 h-auto"
-                >
-                  <Eye size={13} className="mr-1" />
-                  View Students
-                </Button>
-              </div>
+                <div className="flex items-center gap-2 mt-1.5 text-xs text-zinc-500">
+                  <CalendarDays size={13} />
+                  <span>{s.yearSection}</span>
+                  <span>·</span>
+                  <Users size={13} />
+                  <span>{s._count?.grades || 0} student{(s._count?.grades || 0) !== 1 ? 's' : ''}</span>
+                </div>
               </div>
 
               <button onClick={() => setDeleteTarget(s.id)}
@@ -318,60 +268,6 @@ export default function SubjectManager() {
             </div>
           </div>
         </div>
-      )}
-
-      {/* Enrolled Students Dialog */}
-      {showStudentsDialog && selectedSubject && (
-        <Dialog open={showStudentsDialog} onOpenChange={setShowStudentsDialog}>
-          <DialogContent className="max-w-2xl">
-            <DialogHeader>
-              <DialogTitle className="flex items-center gap-2">
-                <UserCheck className="w-5 h-5 text-blue-600" />
-                Enrolled Students - {selectedSubject.name}
-              </DialogTitle>
-            </DialogHeader>
-            <div className="space-y-4">
-              <div className="text-sm text-gray-600">
-                <span className="font-medium">{selectedSubject.code}</span> • {selectedSubject.yearSection}
-              </div>
-              
-              {fetchingStudents ? (
-                <div className="flex items-center justify-center py-8">
-                  <Loader2 className="w-6 h-6 animate-spin text-gray-400" />
-                </div>
-              ) : enrolledStudents.length > 0 ? (
-                <div className="border rounded-lg divide-y max-h-96 overflow-y-auto">
-                  {enrolledStudents.map((student) => (
-                    <div key={student.id} className="flex items-center gap-3 p-4 hover:bg-gray-50">
-                      <div className="w-10 h-10 bg-blue-50 rounded-full flex items-center justify-center">
-                        <Users className="w-5 h-5 text-blue-600" />
-                      </div>
-                      <div className="flex-1">
-                        <p className="font-medium text-gray-900">{student.fullName}</p>
-                        <p className="text-sm text-gray-500">{student.email}</p>
-                        <p className="text-xs text-gray-400">{student.yearSection}</p>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <div className="text-center py-8 text-gray-500">
-                  <Users className="w-12 h-12 mx-auto mb-3 text-gray-300" />
-                  <p>No students enrolled yet</p>
-                  <p className="text-sm text-gray-400 mt-1">
-                    Use the Student Enrollment panel to add students to this subject
-                  </p>
-                </div>
-              )}
-              
-              <div className="flex justify-end pt-4 border-t">
-                <Button variant="outline" onClick={() => setShowStudentsDialog(false)}>
-                  Close
-                </Button>
-              </div>
-            </div>
-          </DialogContent>
-        </Dialog>
       )}
 
     </div>
