@@ -18,7 +18,7 @@ import {
   RefreshCw
 } from 'lucide-react';
 import networkApi from '../services/network-api.js';
-import { computersApi } from '../services/api.js';
+import { computersApi, agentsApi } from '../services/api.js';
 import { io } from 'socket.io-client';
 
 const DeveloperMode = ({ onClose }) => {
@@ -59,6 +59,59 @@ const DeveloperMode = ({ onClose }) => {
         }
       });
 
+      // Listen for agent PC connections
+      socketRef.current.on('computer_online', (data) => {
+        console.log('Agent PC came online:', data);
+        setConnectedPCs(prev => {
+          // Check if PC already exists
+          const exists = prev.some(pc => pc.id === data.computerId);
+          if (exists) {
+            // Update existing PC
+            return prev.map(pc => pc.id === data.computerId ? {
+              id: data.computerId,
+              name: data.name,
+              ip: data.ip,
+              user: data.user,
+              status: 'online',
+              os: 'Windows',
+              specs: data.specs || {},
+              lastSeen: new Date()
+            } : pc);
+          }
+          // Add new PC
+          return [{
+            id: data.computerId,
+            name: data.name,
+            ip: data.ip,
+            user: data.user,
+            status: 'online',
+            os: 'Windows',
+            specs: data.specs || {},
+            lastSeen: new Date()
+          }, ...prev];
+        });
+      });
+
+      // Listen for agent PC status updates
+      socketRef.current.on('computer_status_update', (data) => {
+        console.log('Agent PC status update:', data);
+        setConnectedPCs(prev => prev.map(pc => 
+          pc.id === data.computerId 
+            ? { ...pc, status: data.status, user: data.user, lastSeen: new Date(data.timestamp) }
+            : pc
+        ));
+      });
+
+      // Listen for agent PC disconnections
+      socketRef.current.on('computer_offline', (data) => {
+        console.log('Agent PC went offline:', data);
+        setConnectedPCs(prev => prev.map(pc => 
+          pc.id === data.computerId 
+            ? { ...pc, status: 'offline', lastSeen: new Date(data.lastSeen) }
+            : pc
+        ));
+      });
+
       return () => {
         if (socketRef.current) {
           socketRef.current.disconnect();
@@ -75,10 +128,31 @@ const DeveloperMode = ({ onClose }) => {
 
   const loadDiscoveredDevices = async () => {
     try {
-      const data = await networkApi.getDiscoveredDevices();
-      setConnectedPCs(data.devices || []);
-      if (data.lastScan) {
-        setLastScanTime(new Date(data.lastScan));
+      // Load both network scan devices and agent-connected PCs
+      const [networkData, agentsData] = await Promise.all([
+        networkApi.getDiscoveredDevices().catch(() => ({ devices: [] })),
+        agentsApi.getConnected().catch(() => ({ devices: [] }))
+      ]);
+      
+      // Merge devices, prioritizing agent data for duplicates
+      const networkDevices = networkData.devices || [];
+      const agentDevices = agentsData.devices || [];
+      
+      // Create a map of agent devices for quick lookup
+      const agentDeviceMap = new Map(agentDevices.map(d => [d.id, d]));
+      
+      // Merge: use agent data if available, otherwise use network data
+      const mergedDevices = [
+        ...agentDevices,
+        ...networkDevices.filter(d => !agentDeviceMap.has(d.id))
+      ];
+      
+      setConnectedPCs(mergedDevices);
+      
+      // Use the most recent scan time
+      const lastScan = agentsData.lastScan || networkData.lastScan;
+      if (lastScan) {
+        setLastScanTime(new Date(lastScan));
       }
     } catch (err) {
       console.error('Error loading devices:', err);

@@ -120,4 +120,17 @@ export const hardwareInventoryApi = {
     api.get(`/api/hardware-inventory/computers/laboratory/${laboratoryId}`),
 };
 
+// Agents API (for PC agent management)
+export const agentsApi = {
+  // Get all connected agent PCs
+  getConnected: () => api.get("/api/agents/connected"),
+
+  // Get specific agent PC details
+  getById: (computerId) => api.get(`/api/agents/connected/${computerId}`),
+
+  // Send command to agent PC
+  sendCommand: (computerId, action, params = {}) =>
+    api.post("/api/agents/command", { computerId, action, params }),
+};
+
 export default api;

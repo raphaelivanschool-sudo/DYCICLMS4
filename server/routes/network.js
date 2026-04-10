@@ -50,6 +50,17 @@ router.post('/scan', scanLimiter, async (req, res) => {
       (device) => {
         // Real-time device found callback
         const io = req.app.get('io');
+        const connectedComputers = req.app.get('connectedComputers');
+        
+        // Skip if this device matches an agent-connected IP
+        if (connectedComputers) {
+          for (const computerData of connectedComputers.values()) {
+            if (computerData.computer.ip === device.ip) {
+              return; // Skip this device - agent already provides better data
+            }
+          }
+        }
+        
         if (io) {
           io.to(`user_${userId}`).emit('device_found', {
             device,
@@ -105,13 +116,22 @@ router.get('/status', (req, res) => {
 router.get('/devices', (req, res) => {
   try {
     const devices = networkScanner.getDiscoveredDevices();
+    const connectedComputers = req.app.get('connectedComputers');
     
-    // Add any existing computers from database
-    // This would integrate with your existing computer management system
+    // Filter out network devices that match agent-connected IPs
+    // to prevent duplicates like "PC-125" overwriting real agent data
+    const agentIPs = new Set();
+    if (connectedComputers) {
+      for (const computerData of connectedComputers.values()) {
+        agentIPs.add(computerData.computer.ip);
+      }
+    }
+    
+    const filteredDevices = devices.filter(device => !agentIPs.has(device.ip));
     
     res.json({
-      devices,
-      count: devices.length,
+      devices: filteredDevices,
+      count: filteredDevices.length,
       lastScan: new Date().toISOString()
     });
 

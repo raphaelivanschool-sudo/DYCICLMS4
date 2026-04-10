@@ -33,11 +33,44 @@ async function getComputerInfo() {
       si.graphics()
     ]);
 
-    // Get IP address
-    const activeInterface = Object.values(network).find(
-      iface => iface[0] && iface[0].ip4 && !iface[0].internal
+    // Get IP address - prioritize 192.168.0.x LAN subnet
+    let ipAddress = '127.0.0.1';
+    const allInterfaces = Object.values(network).flat();
+    
+    // First priority: 192.168.0.x (where test PC should be)
+    const lanInterface = allInterfaces.find(
+      iface => iface && iface.ip4 && 
+        !iface.internal && 
+        iface.ip4.startsWith('192.168.0.')
     );
-    const ipAddress = activeInterface ? activeInterface[0].ip4 : '127.0.0.1';
+    
+    if (lanInterface) {
+      ipAddress = lanInterface.ip4;
+    } else {
+      // Second priority: any 192.168.x.x except VirtualBox (192.168.56.x)
+      const homeInterface = allInterfaces.find(
+        iface => iface && iface.ip4 && 
+          !iface.internal && 
+          iface.ip4.startsWith('192.168.') &&
+          !iface.ip4.startsWith('192.168.56.')  // Skip VirtualBox
+      );
+      
+      if (homeInterface) {
+        ipAddress = homeInterface.ip4;
+      } else {
+        // Fallback: any valid non-localhost IP
+        const fallbackInterface = allInterfaces.find(
+          iface => iface && iface.ip4 && 
+            !iface.internal && 
+            !iface.ip4.startsWith('127.') &&
+            !iface.ip4.startsWith('0.') &&
+            !iface.ip4.startsWith('169.254.')
+        );
+        if (fallbackInterface) {
+          ipAddress = fallbackInterface.ip4;
+        }
+      }
+    }
 
     // Get logged in user
     const user = await getLoggedInUser();
@@ -46,7 +79,7 @@ async function getComputerInfo() {
       id: CONFIG.computerId,
       name: os.hostname(),
       ip: ipAddress,
-      mac: activeInterface ? activeInterface[0].mac : 'unknown',
+      mac: validInterface ? validInterface.mac : 'unknown',
       platform: osInfo.platform,
       distro: osInfo.distro,
       release: osInfo.release,
@@ -143,7 +176,7 @@ async function connect() {
         // In production, use a proper authentication token
         token: process.env.AGENT_TOKEN || 'agent-token-placeholder'
       },
-      transports: ['websocket'],
+      transports: ['polling', 'websocket'],
       reconnection: true,
       reconnectionAttempts: CONFIG.maxReconnectAttempts,
       reconnectionDelay: CONFIG.reconnectInterval
