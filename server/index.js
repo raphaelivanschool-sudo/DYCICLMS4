@@ -44,6 +44,9 @@ const prisma = new PrismaClient();
 // Store connected users
 const connectedUsers = new Map();
 
+// Store connected PC agents
+const connectedComputers = new Map();
+
 // Socket.io authentication middleware
 io.use(async (socket, next) => {
   console.log("Socket connection attempt received:", socket.id);
@@ -90,6 +93,67 @@ io.on("connection", (socket) => {
 
   // Join personal room for direct messages
   socket.join(`user_${socket.user.id}`);
+
+  // PC Agent: Handle agent registration
+  socket.on("agent_register", (computerData) => {
+    console.log(`PC Agent registered: ${computerData.name} (${computerData.ip})`);
+    
+    // Store computer connection
+    connectedComputers.set(computerData.id, {
+      socketId: socket.id,
+      computer: computerData,
+      lastSeen: new Date(),
+      status: 'online'
+    });
+    
+    // Join computer-specific room for targeted commands
+    socket.join(`computer_${computerData.id}`);
+    
+    // Broadcast to instructors that a computer is online
+    socket.broadcast.emit("computer_online", {
+      computerId: computerData.id,
+      name: computerData.name,
+      ip: computerData.ip,
+      user: computerData.user,
+      specs: computerData.specs
+    });
+    
+    // Acknowledge registration
+    socket.emit("agent_registered", { success: true });
+  });
+
+  // PC Agent: Handle status updates
+  socket.on("agent_status_update", (statusData) => {
+    const computer = connectedComputers.get(statusData.computerId);
+    if (computer) {
+      computer.lastSeen = new Date();
+      computer.status = statusData.status;
+      computer.user = statusData.user;
+      
+      // Broadcast status update to instructors
+      socket.broadcast.emit("computer_status_update", {
+        computerId: statusData.computerId,
+        status: statusData.status,
+        user: statusData.user,
+        timestamp: new Date()
+      });
+    }
+  });
+
+  // PC Agent: Handle commands from instructors
+  socket.on("agent_command", (command) => {
+    const { targetComputerId, action, params } = command;
+    
+    console.log(`Command received: ${action} for computer ${targetComputerId}`);
+    
+    // Forward command to the target computer's agent
+    io.to(`computer_${targetComputerId}`).emit("execute_command", {
+      action,
+      params,
+      from: socket.user.id,
+      timestamp: new Date()
+    });
+  });
 
   // Chat app: addUser event
   let activeUsers = [];
@@ -236,6 +300,22 @@ io.on("connection", (socket) => {
       userId: socket.user.id,
       lastSeen: new Date(),
     });
+    
+    // Check if this socket was a PC agent and clean up
+    for (const [computerId, computer] of connectedComputers.entries()) {
+      if (computer.socketId === socket.id) {
+        console.log(`PC Agent disconnected: ${computer.computer.name}`);
+        connectedComputers.delete(computerId);
+        
+        // Broadcast computer offline status
+        socket.broadcast.emit("computer_offline", {
+          computerId: computerId,
+          name: computer.computer.name,
+          lastSeen: new Date()
+        });
+        break;
+      }
+    }
   });
 });
 

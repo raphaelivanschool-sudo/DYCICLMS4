@@ -262,7 +262,7 @@ class NetworkScanner {
   }
 
   // Main network scan function (optimized like Python version)
-  async scanNetwork(range = null, onProgress = null) {
+  async scanNetwork(range = null, onProgress = null, onDeviceFound = null) {
     if (this.isScanning) {
       throw new Error('Scan already in progress');
     }
@@ -310,9 +310,9 @@ class NetworkScanner {
 
           // Only include computers and servers
           if (deviceType === 'computer' || deviceType === 'server') {
-            detailedDevices.push({
+            const pcData = {
               id: device.ip.replace(/\./g, '-'),
-              name: `PC-${device.ip.split('.').pop().padStart(3, '0')}`,
+              name: device.hostname !== 'Unknown' ? device.hostname : `PC-${device.ip.split('.').pop().padStart(3, '0')}`,
               ip: device.ip,
               hostname: device.hostname,
               mac: macAddress,
@@ -326,7 +326,14 @@ class NetworkScanner {
               ram: 'Unknown',
               storage: 'Unknown',
               responseTime: device.responseTime
-            });
+            };
+            
+            detailedDevices.push(pcData);
+            
+            // Emit device in real-time as it's discovered
+            if (onDeviceFound) {
+              onDeviceFound(pcData);
+            }
           }
         } catch (error) {
           console.error(`Error getting details for ${device.ip}:`, error);

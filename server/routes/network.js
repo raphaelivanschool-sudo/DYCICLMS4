@@ -33,18 +33,31 @@ router.post('/scan', scanLimiter, async (req, res) => {
       });
     }
 
-    // Start scan in background
-    const scanPromise = networkScanner.scanNetwork(range, (progress, devicesFound) => {
-      // Emit progress via WebSocket if available
-      const io = req.app.get('io');
-      if (io) {
-        io.to(`user_${userId}`).emit('scan_progress', {
-          progress,
-          devicesFound,
-          userId
-        });
+    // Start scan in background with real-time device discovery
+    const scanPromise = networkScanner.scanNetwork(
+      range,
+      (progress, devicesFound) => {
+        // Emit progress via WebSocket if available
+        const io = req.app.get('io');
+        if (io) {
+          io.to(`user_${userId}`).emit('scan_progress', {
+            progress,
+            devicesFound,
+            userId
+          });
+        }
+      },
+      (device) => {
+        // Real-time device found callback
+        const io = req.app.get('io');
+        if (io) {
+          io.to(`user_${userId}`).emit('device_found', {
+            device,
+            userId
+          });
+        }
       }
-    });
+    );
 
     // Store scan promise for this user
     activeScans.set(userId, scanPromise);

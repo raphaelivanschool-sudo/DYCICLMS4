@@ -18,6 +18,7 @@ import {
   RefreshCw
 } from 'lucide-react';
 import networkApi from '../services/network-api.js';
+import { computersApi } from '../services/api.js';
 import { io } from 'socket.io-client';
 
 const DeveloperMode = ({ onClose }) => {
@@ -28,6 +29,9 @@ const DeveloperMode = ({ onClose }) => {
   const [scanStatus, setScanStatus] = useState(null);
   const [error, setError] = useState(null);
   const [lastScanTime, setLastScanTime] = useState(null);
+  const [showLockModal, setShowLockModal] = useState(false);
+  const [isLocking, setIsLocking] = useState(false);
+  const [lockError, setLockError] = useState(null);
   const socketRef = useRef(null);
 
   // Initialize socket connection for real-time updates
@@ -40,7 +44,19 @@ const DeveloperMode = ({ onClose }) => {
 
       socketRef.current.on('scan_progress', (data) => {
         setScanProgress(data.progress);
-        // You could update device count here too
+      });
+
+      // Listen for real-time device discoveries
+      socketRef.current.on('device_found', (data) => {
+        if (data.device) {
+          setConnectedPCs(prev => {
+            // Check if device already exists to avoid duplicates
+            const exists = prev.some(pc => pc.id === data.device.id);
+            if (exists) return prev;
+            // Add new device to the beginning of the list
+            return [data.device, ...prev];
+          });
+        }
       });
 
       return () => {
@@ -140,6 +156,55 @@ const DeveloperMode = ({ onClose }) => {
     }
   };
 
+  const handleLockPCs = () => {
+    if (selectedPCs.length === 0) return;
+
+    // Single PC - use native confirm
+    if (selectedPCs.length === 1) {
+      const pc = connectedPCs.find(p => p.id === selectedPCs[0]);
+      const confirmMessage = `Are you sure you want to lock ${pc?.name || 'this computer'} (${pc?.ip || 'Unknown IP'})?\n\nThis will immediately lock the computer.`;
+      
+      if (window.confirm(confirmMessage)) {
+        performLock(selectedPCs);
+      }
+    } else {
+      // Multiple PCs - show custom modal
+      setShowLockModal(true);
+      setLockError(null);
+    }
+  };
+
+  const performLock = async (pcIds) => {
+    setIsLocking(true);
+    setLockError(null);
+    
+    try {
+      // Lock each selected PC
+      const lockPromises = pcIds.map(async (pcId) => {
+        await computersApi.update(pcId, { isLocked: true });
+      });
+      
+      await Promise.all(lockPromises);
+      
+      // Refresh the PC list to show updated status
+      await loadDiscoveredDevices();
+      
+      // Clear selection and close modal
+      setSelectedPCs([]);
+      setShowLockModal(false);
+      
+    } catch (err) {
+      console.error('Error locking PCs:', err);
+      setLockError(err.response?.data?.message || 'Failed to lock one or more computers. Please try again.');
+    } finally {
+      setIsLocking(false);
+    }
+  };
+
+  const getSelectedPCDetails = () => {
+    return selectedPCs.map(id => connectedPCs.find(pc => pc.id === id)).filter(Boolean);
+  };
+
   const getStatusColor = (status) => {
     switch (status) {
       case 'online': return 'bg-green-100 text-green-800 border-green-200';
@@ -202,7 +267,7 @@ const DeveloperMode = ({ onClose }) => {
               {isScanning ? (
                 <>
                   <Loader2 className="w-4 h-4 animate-spin" />
-                  Scanning ({scanProgress}%)
+                  Scanning... Found {connectedPCs.length} PCs ({scanProgress}%)
                 </>
               ) : (
                 <>
@@ -212,6 +277,7 @@ const DeveloperMode = ({ onClose }) => {
               )}
             </button>
             <button 
+              onClick={handleLockPCs}
               className="flex items-center gap-2 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               disabled={selectedPCs.length === 0}
             >
@@ -405,6 +471,95 @@ const DeveloperMode = ({ onClose }) => {
             </button>
           </div>
         </div>
+
+        {/* Lock Confirmation Modal */}
+        {showLockModal && (
+          <div className="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50">
+            <div className="bg-white rounded-xl shadow-2xl w-full max-w-lg mx-4 overflow-hidden">
+              {/* Modal Header */}
+              <div className="bg-red-600 text-white p-4 flex items-center justify-between">
+                <h3 className="text-lg font-semibold flex items-center gap-2">
+                  <Lock className="w-5 h-5" />
+                  Lock {selectedPCs.length} Computers?
+                </h3>
+                <button
+                  onClick={() => !isLocking && setShowLockModal(false)}
+                  className="p-1 hover:bg-red-700 rounded-lg transition-colors disabled:opacity-50"
+                  disabled={isLocking}
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              {/* Modal Body */}
+              <div className="p-6">
+                <p className="text-gray-700 mb-4">
+                  You are about to lock the following computers. This action will immediately lock the selected PCs.
+                </p>
+
+                {/* PC List */}
+                <div className="max-h-48 overflow-y-auto border border-gray-200 rounded-lg mb-4">
+                  {getSelectedPCDetails().map((pc) => (
+                    <div key={pc.id} className="flex items-center justify-between p-3 border-b border-gray-100 last:border-b-0">
+                      <div>
+                        <p className="font-medium text-gray-900">{pc.name}</p>
+                        <p className="text-sm text-gray-500">{pc.ip}</p>
+                      </div>
+                      <span className={`px-2 py-1 rounded-full text-xs font-medium border ${getStatusColor(pc.status)}`}>
+                        {pc.status?.toUpperCase() || 'UNKNOWN'}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+
+                {/* Warning */}
+                <div className="flex items-start gap-3 p-3 bg-yellow-50 border border-yellow-200 rounded-lg mb-4">
+                  <div className="p-1 bg-yellow-100 rounded-full flex-shrink-0">
+                    <Lock className="w-4 h-4 text-yellow-700" />
+                  </div>
+                  <p className="text-sm text-yellow-800">
+                    <strong>Warning:</strong> This will immediately lock the selected computers. Users will be logged out and the PCs will require administrator credentials to unlock.
+                  </p>
+                </div>
+
+                {/* Error Message */}
+                {lockError && (
+                  <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg">
+                    <p className="text-sm text-red-600">{lockError}</p>
+                  </div>
+                )}
+              </div>
+
+              {/* Modal Footer */}
+              <div className="bg-gray-50 px-6 py-4 border-t border-gray-200 flex items-center justify-end gap-3">
+                <button
+                  onClick={() => setShowLockModal(false)}
+                  disabled={isLocking}
+                  className="px-4 py-2 text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors disabled:opacity-50"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={() => performLock(selectedPCs)}
+                  disabled={isLocking}
+                  className="flex items-center gap-2 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors disabled:opacity-50"
+                >
+                  {isLocking ? (
+                    <>
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                      Locking...
+                    </>
+                  ) : (
+                    <>
+                      <Lock className="w-4 h-4" />
+                      Lock {selectedPCs.length} {selectedPCs.length === 1 ? 'Computer' : 'Computers'}
+                    </>
+                  )}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
