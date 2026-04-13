@@ -25,14 +25,26 @@ router.post('/login', async (req, res) => {
       where: { username }
     });
 
+    console.log('DEBUG - User found:', user ? 'YES' : 'NO');
+    if (user) {
+      console.log('DEBUG - User ID:', user.id);
+      console.log('DEBUG - User role:', user.role);
+      console.log('DEBUG - Stored password hash:', user.password.substring(0, 20) + '...');
+    }
+
     if (!user) {
+      console.log('DEBUG - User not found, returning 401');
       return res.status(401).json({ message: 'Invalid credentials' });
     }
 
     // Compare password
+    console.log('DEBUG - Attempting password comparison...');
+    console.log('DEBUG - Input password length:', password.length);
     const isPasswordValid = await bcrypt.compare(password, user.password);
+    console.log('DEBUG - Password valid:', isPasswordValid);
 
     if (!isPasswordValid) {
+      console.log('DEBUG - Password invalid, returning 401');
       return res.status(401).json({ message: 'Invalid credentials' });
     }
 

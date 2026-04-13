@@ -31,6 +31,7 @@ model User {
   groupMemberships GroupMember[]
   subjectsHandled Subject[] @relation("InstructorSubjects")
   grades          Grade[]   @relation("StudentGrades")
+  agentActivityLogs AgentActivityLog[]
 }
 
 model Laboratory {
@@ -395,4 +396,45 @@ model GradeComponent {
   type     String
   score    Float
   maxScore Float
+}
+
+// Agent PC Control models
+model Agent {
+  id              Int             @id @default(autoincrement())
+  hostname        String
+  ipAddress       String
+  mac             String          @unique
+  platform        String
+  status          AgentStatus     @default(OFFLINE)
+  lastSeen        DateTime?
+  registeredAt    DateTime        @default(now())
+  activityLogs    AgentActivityLog[]
+
+  @@index([status])
+  @@index([lastSeen])
+}
+
+model AgentActivityLog {
+  id          Int           @id @default(autoincrement())
+  agentId     Int
+  agent       Agent         @relation(fields: [agentId], references: [id], onDelete: Cascade)
+  command     String
+  issuedBy    Int
+  user        User          @relation(fields: [issuedBy], references: [id])
+  timestamp   DateTime      @default(now())
+  status      LogStatus     @default(SENT)
+
+  @@index([agentId])
+  @@index([timestamp])
+}
+
+enum AgentStatus {
+  ONLINE
+  OFFLINE
+}
+
+enum LogStatus {
+  SENT
+  EXECUTED
+  FAILED
 }
