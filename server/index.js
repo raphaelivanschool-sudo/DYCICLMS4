@@ -22,18 +22,8 @@ const httpServer = createServer(app);
 const io = new Server(httpServer, {
   cors: {
     origin: function (origin, callback) {
-      if (!origin) return callback(null, true);
-      if (
-        origin.startsWith("http://localhost:") ||
-        origin.startsWith("http://127.0.0.1:")
-      ) {
-        return callback(null, true);
-      }
-      const allowedOrigin = process.env.CLIENT_URL;
-      if (origin === allowedOrigin) {
-        return callback(null, true);
-      }
-      callback(new Error("Not allowed by CORS"));
+      // Allow all origins for agent and client connections
+      callback(null, true);
     },
     credentials: true,
   },
@@ -43,6 +33,9 @@ const prisma = new PrismaClient();
 
 // Store connected users
 const connectedUsers = new Map();
+
+// Store connected PC agents
+const connectedComputers = new Map();
 
 // Socket.io authentication middleware
 io.use(async (socket, next) => {
@@ -54,6 +47,13 @@ io.use(async (socket, next) => {
     if (!token) {
       console.log("Rejecting socket - no token");
       return next(new Error("Authentication required"));
+    }
+
+    // Check if this is an agent connection
+    if (token === 'agent-token-placeholder' || token.startsWith('agent-')) {
+      console.log("Agent connection accepted");
+      socket.isAgent = true;
+      return next();
     }
 
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
@@ -79,6 +79,81 @@ io.use(async (socket, next) => {
 
 // Socket.io connection handling
 io.on("connection", (socket) => {
+  // Handle agent connections differently from user connections
+  if (socket.isAgent) {
+    console.log(`Agent connected: ${socket.id}`);
+    
+    // PC Agent: Handle agent registration
+    socket.on("agent_register", (computerData) => {
+      console.log(`PC Agent registered: ${computerData.name} (${computerData.ip})`);
+      
+      // Store computer connection
+      connectedComputers.set(computerData.id, {
+        socketId: socket.id,
+        computer: computerData,
+        lastSeen: new Date(),
+        status: 'online'
+      });
+      
+      // Join computer-specific room for targeted commands
+      socket.join(`computer_${computerData.id}`);
+      
+      // Broadcast to instructors that a computer is online
+      socket.broadcast.emit("computer_online", {
+        computerId: computerData.id,
+        name: computerData.name,
+        ip: computerData.ip,
+        user: computerData.user,
+        specs: computerData.specs
+      });
+      
+      // Acknowledge registration
+      socket.emit("agent_registered", { success: true });
+    });
+
+    // PC Agent: Handle status updates
+    socket.on("agent_status_update", (statusData) => {
+      const computer = connectedComputers.get(statusData.computerId);
+      if (computer) {
+        computer.lastSeen = new Date();
+        computer.status = statusData.status;
+        computer.user = statusData.user;
+        
+        // Broadcast status update to instructors
+        socket.broadcast.emit("computer_status_update", {
+          computerId: statusData.computerId,
+          status: statusData.status,
+          user: statusData.user,
+          timestamp: new Date()
+        });
+      }
+    });
+
+    // Handle agent disconnection
+    socket.on("disconnect", () => {
+      console.log(`Agent disconnected: ${socket.id}`);
+      
+      // Find and remove the computer
+      for (const [computerId, computer] of connectedComputers.entries()) {
+        if (computer.socketId === socket.id) {
+          console.log(`PC Agent disconnected: ${computer.computer.name}`);
+          connectedComputers.delete(computerId);
+          
+          // Broadcast computer offline status
+          socket.broadcast.emit("computer_offline", {
+            computerId: computerId,
+            name: computer.computer.name,
+            lastSeen: new Date()
+          });
+          break;
+        }
+      }
+    });
+    
+    return; // Skip user-specific handlers for agents
+  }
+
+  // User connection handling
   console.log(`User connected: ${socket.user.fullName} (${socket.user.id})`);
 
   // Store user connection
@@ -90,6 +165,21 @@ io.on("connection", (socket) => {
 
   // Join personal room for direct messages
   socket.join(`user_${socket.user.id}`);
+
+  // PC Agent: Handle commands from instructors
+  socket.on("agent_command", (command) => {
+    const { targetComputerId, action, params } = command;
+    
+    console.log(`Command received: ${action} for computer ${targetComputerId}`);
+    
+    // Forward command to the target computer's agent
+    io.to(`computer_${targetComputerId}`).emit("execute_command", {
+      action,
+      params,
+      from: socket.user.id,
+      timestamp: new Date()
+    });
+  });
 
   // Chat app: addUser event
   let activeUsers = [];
@@ -236,32 +326,40 @@ io.on("connection", (socket) => {
       userId: socket.user.id,
       lastSeen: new Date(),
     });
+    
+    // Check if this socket was a PC agent and clean up
+    for (const [computerId, computer] of connectedComputers.entries()) {
+      if (computer.socketId === socket.id) {
+        console.log(`PC Agent disconnected: ${computer.computer.name}`);
+        connectedComputers.delete(computerId);
+        
+        // Broadcast computer offline status
+        socket.broadcast.emit("computer_offline", {
+          computerId: computerId,
+          name: computer.computer.name,
+          lastSeen: new Date()
+        });
+        break;
+      }
+    }
   });
 });
 
-// Make io accessible to routes
+// Make io and connectedComputers accessible to routes
 app.set("io", io);
+app.set("connectedComputers", connectedComputers);
 
 // Middleware
 app.use(
   cors({
     origin: function (origin, callback) {
-      if (!origin) return callback(null, true);
-      if (
-        origin.startsWith("http://localhost:") ||
-        origin.startsWith("http://127.0.0.1:")
-      ) {
-        return callback(null, true);
-      }
-      const allowedOrigin = process.env.CLIENT_URL;
-      if (origin === allowedOrigin) {
-        return callback(null, true);
-      }
-      callback(new Error("Not allowed by CORS"));
+      // Allow all origins for agent connections
+      callback(null, true);
     },
     credentials: true,
   }),
 );
+
 
 app.use(express.json());
 
@@ -278,6 +376,7 @@ import schedulesRoutes from "./routes/schedules.js";
 import gradingRoutes from "./routes/grading.js";
 import networkRoutes from "./routes/network.js";
 import logsRoutes from "./routes/logs.js";
+import agentsRoutes from "./routes/agents.js";
 import { authenticateToken } from "./middleware/auth.js";
 app.use("/api/auth", authRoutes);
 app.use("/api/labs", authenticateToken, labsRoutes);
@@ -291,6 +390,7 @@ app.use("/api/schedules", authenticateToken, schedulesRoutes);
 app.use("/api/grading", authenticateToken, gradingRoutes);
 app.use("/api/network", authenticateToken, networkRoutes);
 app.use("/api/logs", authenticateToken, logsRoutes);
+app.use("/api/agents", authenticateToken, agentsRoutes);
 
 // Health check endpoint
 app.get("/api/health", (req, res) => {
@@ -301,9 +401,18 @@ app.get("/api/health", (req, res) => {
   });
 });
 
+// Root health check for easier testing
+app.get("/health", (req, res) => {
+  res.json({
+    status: "OK",
+    message: "Server is running",
+    connectedUsers: connectedUsers.size,
+  });
+});
+
 // Start server
 const PORT = process.env.PORT || 3001;
-httpServer.listen(PORT, () => {
+httpServer.listen(PORT, '0.0.0.0', () => {
   console.log(`Server is running on port ${PORT}`);
   console.log(`Socket.io is ready for real-time messaging`);
   console.log(

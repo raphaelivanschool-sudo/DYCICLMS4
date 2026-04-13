@@ -20,20 +20,40 @@ class NetworkScanner {
       let localIP = null;
       let targetSubnet = null;
 
-      // First, look for the 192.168.100.x subnet (where our target PC is)
+      // First, look for the 192.168.0.x subnet (where test PC is located)
       for (const name of Object.keys(interfaces)) {
         for (const iface of interfaces[name]) {
           if (iface.family === 'IPv4' && !iface.internal) {
             const ip = iface.address;
-            if (ip.startsWith('192.168.100.')) {
+            if (ip.startsWith('192.168.0.')) {
               localIP = ip;
-              targetSubnet = '192.168.100';
+              targetSubnet = '192.168.0';
               console.log(`Found target subnet: ${targetSubnet}.x`);
               break;
             }
           }
         }
         if (targetSubnet) break;
+      }
+
+      // Second priority: look for any 192.168.x.x subnet (common LAN)
+      if (!targetSubnet) {
+        for (const name of Object.keys(interfaces)) {
+          for (const iface of interfaces[name]) {
+            if (iface.family === 'IPv4' && !iface.internal) {
+              const ip = iface.address;
+              if (ip.startsWith('192.168.')) {
+                localIP = ip;
+                targetSubnet = '192.168';
+                const parts = ip.split('.');
+                targetSubnet = `${parts[0]}.${parts[1]}.${parts[2]}`;
+                console.log(`Found 192.168 subnet: ${targetSubnet}.x`);
+                break;
+              }
+            }
+          }
+          if (targetSubnet) break;
+        }
       }
 
       // If target subnet not found, use any non-internal IPv4 interface
@@ -262,7 +282,7 @@ class NetworkScanner {
   }
 
   // Main network scan function (optimized like Python version)
-  async scanNetwork(range = null, onProgress = null) {
+  async scanNetwork(range = null, onProgress = null, onDeviceFound = null) {
     if (this.isScanning) {
       throw new Error('Scan already in progress');
     }
@@ -299,6 +319,12 @@ class NetworkScanner {
       for (let i = 0; i < onlineDevices.length; i++) {
         const device = onlineDevices[i];
         
+        // Skip the server's own IP (prevents self-detection as PC-XXX)
+        if (device.ip === localIP) {
+          console.log(`Skipping server's own IP: ${device.ip}`);
+          continue;
+        }
+        
         try {
           const [openPorts, macAddress] = await Promise.all([
             this.checkPorts(device.ip),
@@ -308,11 +334,12 @@ class NetworkScanner {
           const deviceType = this.identifyDeviceType(openPorts, device.ip);
           const os = this.detectOS(openPorts);
 
-          // Only include computers and servers
-          if (deviceType === 'computer' || deviceType === 'server') {
-            detailedDevices.push({
+          // Include all online devices that respond to ping
+          // (relaxed requirement - don't filter by ports)
+          if (deviceType === 'computer' || deviceType === 'server' || deviceType === 'unknown') {
+            const pcData = {
               id: device.ip.replace(/\./g, '-'),
-              name: `PC-${device.ip.split('.').pop().padStart(3, '0')}`,
+              name: device.hostname !== 'Unknown' ? device.hostname : `PC-${device.ip.split('.').pop().padStart(3, '0')}`,
               ip: device.ip,
               hostname: device.hostname,
               mac: macAddress,
@@ -326,7 +353,14 @@ class NetworkScanner {
               ram: 'Unknown',
               storage: 'Unknown',
               responseTime: device.responseTime
-            });
+            };
+            
+            detailedDevices.push(pcData);
+            
+            // Emit device in real-time as it's discovered
+            if (onDeviceFound) {
+              onDeviceFound(pcData);
+            }
           }
         } catch (error) {
           console.error(`Error getting details for ${device.ip}:`, error);
