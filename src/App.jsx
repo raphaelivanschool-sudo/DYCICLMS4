@@ -36,6 +36,9 @@ import StudentMessaging from "./pages/student/Messaging";
 import GradingPanel from "./pages/grading/GradingPanel";
 import MyGrades from "./pages/grading/MyGrades";
 
+// Agent Control imports
+import { AgentControlPage } from "./features/agent-control";
+
 function App() {
   return (
     <Router>
@@ -64,6 +67,7 @@ function App() {
           <Route path="tickets" element={<Tickets />} />
           <Route path="hardware-inventory" element={<HardwareInventory />} />
           <Route path="grading" element={<GradingPanel />} />
+          <Route path="agent-control" element={<AgentControlPage />} />
         </Route>
 
         {/* Instructor Routes */}

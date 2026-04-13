@@ -2,7 +2,6 @@ import { useState, useEffect } from 'react';
 import {
   Ticket,
   Search,
-  Filter,
   Clock,
   CheckCircle,
   AlertCircle,
@@ -15,11 +14,9 @@ import {
   Wrench,
   Calendar,
   RefreshCw,
-  MoreHorizontal,
   HardDrive,
   Wifi,
-  CheckCircle2,
-  XCircle
+  CheckCircle2
 } from 'lucide-react';
 import ticketService from '../../services/ticketService';
 
