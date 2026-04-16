@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { dashboardApi } from '../../services/api.js';
 import DeveloperMode from '../../components/DeveloperMode.jsx';
 import DeveloperModeNew from '../../components/DeveloperMode-new.jsx';
+import PCControlPanel from '../../components/PCControlPanel.jsx';
 import {
   Building2,
   Monitor,
@@ -86,6 +87,7 @@ function Dashboard() {
   const [lastUpdated, setLastUpdated] = useState(null);
   const [showDeveloperMode, setShowDeveloperMode] = useState(false);
   const [showDeveloperModeNew, setShowDeveloperModeNew] = useState(false);
+  const [showPCControl, setShowPCControl] = useState(false);
 
   // Fetch dashboard data
   const fetchDashboardData = async () => {
@@ -607,6 +609,24 @@ function Dashboard() {
       {showDeveloperModeNew && (
         <DeveloperModeNew onClose={() => setShowDeveloperModeNew(false)} />
       )}
+
+      {/* PC Control Panel Section */}
+      <div className="mt-8">
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-xl font-bold text-gray-900">Lab Computer Management</h2>
+          <button
+            onClick={() => setShowPCControl(!showPCControl)}
+            className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+          >
+            <Monitor className="w-5 h-5" />
+            {showPCControl ? 'Hide PC Control' : 'Show PC Control'}
+          </button>
+        </div>
+        
+        {showPCControl && (
+          <PCControlPanel />
+        )}
+      </div>
     </div>
   );
 }
