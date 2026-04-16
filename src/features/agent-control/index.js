@@ -8,6 +8,7 @@ export { MachineCard } from './components/MachineCard';
 export { ScreenViewer } from './components/ScreenViewer';
 export { ActivityLog } from './components/ActivityLog';
 export { AlertBanner } from './components/AlertBanner';
+export { VNCViewer } from './components/VNCViewer';
 
 // Hooks
 export { useAgentSocket } from './hooks/useAgentSocket';

@@ -131,6 +131,19 @@ export const agentsApi = {
   // Send command to agent PC
   sendCommand: (computerId, action, params = {}) =>
     api.post("/api/agents/command", { computerId, action, params }),
+
+  // Generate agent installer
+  createInstaller: (room, serverUrl, computerName) =>
+    api.post("/api/agents/installer", { room, serverUrl, computerName }),
+
+  // Get all registered agents
+  getAll: () => api.get("/api/agents"),
+
+  // Get agent stats
+  getStats: () => api.get("/api/agents/stats"),
+
+  // Wake on LAN
+  wakeOnLAN: (mac) => api.post("/api/agents/wake", { mac }),
 };
 
 export default api;

@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { dashboardApi } from '../../services/api.js';
 import DeveloperMode from '../../components/DeveloperMode.jsx';
+import DeveloperModeNew from '../../components/DeveloperMode-new.jsx';
 import {
   Building2,
   Monitor,
@@ -84,6 +85,7 @@ function Dashboard() {
   const [error, setError] = useState(null);
   const [lastUpdated, setLastUpdated] = useState(null);
   const [showDeveloperMode, setShowDeveloperMode] = useState(false);
+  const [showDeveloperModeNew, setShowDeveloperModeNew] = useState(false);
 
   // Fetch dashboard data
   const fetchDashboardData = async () => {
@@ -588,6 +590,22 @@ function Dashboard() {
       {/* Developer Mode Modal */}
       {showDeveloperMode && (
         <DeveloperMode onClose={() => setShowDeveloperMode(false)} />
+      )}
+
+      {/* Developer Mode New Button */}
+      <div className="flex justify-center pt-4">
+        <button
+          onClick={() => setShowDeveloperModeNew(true)}
+          className="flex items-center gap-2 px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium"
+        >
+          <Monitor className="w-5 h-5" />
+          Developer Mode (New)
+        </button>
+      </div>
+
+      {/* Developer Mode New Modal */}
+      {showDeveloperModeNew && (
+        <DeveloperModeNew onClose={() => setShowDeveloperModeNew(false)} />
       )}
     </div>
   );

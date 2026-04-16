@@ -275,4 +275,155 @@ router.post('/command', authenticateToken, (req, res) => {
   }
 });
 
+// POST /api/agents/installer - Generate agent installer configuration
+router.post('/installer', authenticateToken, async (req, res) => {
+  try {
+    const { room, serverUrl, computerName } = req.body;
+    
+    if (!room || !serverUrl) {
+      return res.status(400).json({
+        success: false,
+        error: 'room and serverUrl are required'
+      });
+    }
+
+    // Generate unique agent token
+    const agentToken = `agent-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+    
+    // Create agent configuration
+    const config = {
+      serverUrl,
+      agentToken,
+      room,
+      computerId: `pc-${Date.now()}`,
+      createdAt: new Date(),
+      createdBy: req.user.id
+    };
+
+    // Store in database for tracking
+    await prisma.agent.create({
+      data: {
+        id: config.computerId,
+        hostname: computerName || `PC-${config.computerId.slice(-6)}`,
+        mac: 'PENDING_REGISTRATION',
+        ip: 'PENDING_REGISTRATION',
+        room,
+        token: agentToken,
+        status: 'OFFLINE',
+        createdBy: req.user.id,
+        lastSeen: new Date()
+      }
+    });
+
+    // Generate installation script content
+    const installScript = `@echo off
+echo ========================================
+echo DYCI PC Agent Installer
+echo Room: ${room}
+echo Server: ${serverUrl}
+echo ========================================
+echo.
+
+set AGENT_DIR=%ProgramFiles%\\DYCI-Agent
+set CONFIG_DIR=%ProgramData%\\DYCI-Agent
+
+:: Create directories
+if not exist "%AGENT_DIR%" mkdir "%AGENT_DIR%"
+if not exist "%CONFIG_DIR%" mkdir "%CONFIG_DIR%"
+
+:: Create config file
+echo {> "%CONFIG_DIR%\\config.json"
+echo   "serverUrl": "${serverUrl}",>> "%CONFIG_DIR%\\config.json"
+echo   "agentToken": "${agentToken}",>> "%CONFIG_DIR%\\config.json"
+echo   "room": "${room}",>> "%CONFIG_DIR%\\config.json"
+echo   "computerId": "${config.computerId}",>> "%CONFIG_DIR%\\config.json"
+echo   "autoStartVNC": false,>> "%CONFIG_DIR%\\config.json"
+echo   "heartbeatInterval": 30000>> "%CONFIG_DIR%\\config.json"
+echo }>> "%CONFIG_DIR%\\config.json"
+
+:: Create firewall rule
+echo Creating Windows Firewall rule...
+netsh advfirewall firewall add rule name="DYCI PC Agent" dir=in action=allow protocol=tcp localport=3001,5900-5905 program="%AGENT_DIR%\\agent.exe" description="Allows DYCI Lab Management Agent to communicate"
+
+:: Install service
+echo Installing service...
+"%AGENT_DIR%\\agent.exe" --install-service
+
+:: Start service
+echo Starting agent...
+net start "DYCI PC Agent"
+
+echo.
+echo ========================================
+echo Installation complete!
+echo Agent will connect to: ${serverUrl}
+echo Room: ${room}
+echo ========================================
+pause
+`;
+
+    res.json({
+      success: true,
+      message: 'Agent installer configuration generated',
+      config: {
+        agentToken,
+        computerId: config.computerId,
+        room,
+        serverUrl
+      },
+      installScript,
+      downloadUrl: `/api/agents/download/${config.computerId}`,
+      instructions: {
+        windows: `Run the following as Administrator on the guest PC:
+1. Download agent: ${serverUrl}/api/agents/download/${config.computerId}
+2. Run: agent-installer.exe /S /SERVER=${serverUrl} /ROOM=${room}
+3. Agent will auto-connect and appear in dashboard`
+      }
+    });
+
+  } catch (error) {
+    console.error('Error generating installer:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to generate installer'
+    });
+  }
+});
+
+// GET /api/agents/connected - Get currently connected agents
+router.get('/connected', authenticateToken, (req, res) => {
+  try {
+    const io = req.app.get('io');
+    const connectedComputers = req.app.get('connectedComputers');
+    
+    if (!connectedComputers) {
+      return res.json({
+        success: true,
+        devices: [],
+        count: 0,
+        lastScan: new Date().toISOString()
+      });
+    }
+
+    const devices = Array.from(connectedComputers.values()).map(data => ({
+      ...data.computer,
+      status: data.status,
+      lastSeen: data.lastSeen
+    }));
+
+    res.json({
+      success: true,
+      devices,
+      count: devices.length,
+      lastScan: new Date().toISOString()
+    });
+  } catch (error) {
+    console.error('Error getting connected agents:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to get connected agents'
+    });
+  }
+});
+
 export default router;
